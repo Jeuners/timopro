@@ -40,14 +40,19 @@ def kategorisiere(
     batch_groesse: int = 25,
     fortschritt=None,
     parallel: int = 8,
+    cache=None,
+    statistik: dict | None = None,
 ) -> list[KategorisiertesAngebot]:
     """Ordnet jedes Angebot einer Produktgruppe zu, ohne Daten zu verändern.
 
-    `fortschritt`: optionaler Callback (erledigte_batches, gesamt_batches) --
-    für Live-Anzeigen (z. B. die Web-UI).
+    `fortschritt`: optionaler Callback (erledigte_batches, gesamt_batches).
     `parallel`: bis zu so viele Batches gleichzeitig (LLM-Calls sind I/O-bound).
-    Ändert die Logik nicht -- nur die Ausführungs-Reihenfolge. Die Zuordnung
-    erfolgt id-basiert, ist also reihenfolge-unabhängig.
+    `cache`: optionaler ProduktCache. Bekannte Produkte werden per Lookup direkt
+        übernommen (kein LLM); nur unbekannte gehen ans Modell, dedupliziert
+        (ein Produkt = ein Posten). Neue SICHERE Zuordnungen werden zurück-
+        geschrieben. Default None -> heutiges Verhalten, unverändert.
+    `statistik`: optionales dict, wird mit {aus_cache, neu} befüllt.
+    Die Zuordnung ist id-basiert, also reihenfolge- (und parallel-)unabhängig.
     """
     import threading
 
@@ -55,9 +60,37 @@ def kategorisiere(
     ergebnis: dict[str, KategorisiertesAngebot] = {}
     lock = threading.Lock()
 
+    # --- Cache-Phase: bekannte Produkte übernehmen, Rest deduplizieren -------
+    aids_von_schluessel: dict[str, list[str]] = {}
+    schluessel_von_repr: dict[str, str] = {}  # Repräsentant-id -> Produkt-Schlüssel
+    neu_fuer_cache: dict[str, str] = {}
+    aus_cache = 0
+    modell_name = getattr(kategorisierer, "_modell", None)
+
+    if cache is not None:
+        from .produktcache import produkt_schluessel
+
+        repraesentant: dict[str, Angebot] = {}
+        for a in angebote:
+            s = produkt_schluessel(a.titel, a.marke)
+            gruppe = cache.hole(s)
+            if gruppe is not None:
+                ergebnis[a.angebot_id] = KategorisiertesAngebot(
+                    angebot=a, gruppe=gruppe, unsicher=False
+                )
+                aus_cache += 1
+            else:
+                aids_von_schluessel.setdefault(s, []).append(a.angebot_id)
+                if s not in repraesentant:
+                    repraesentant[s] = a
+                    schluessel_von_repr[a.angebot_id] = s
+        zu_kategorisieren = list(repraesentant.values())
+    else:
+        zu_kategorisieren = angebote
+
     batches = [
-        angebote[start : start + batch_groesse]
-        for start in range(0, len(angebote), batch_groesse)
+        zu_kategorisieren[start : start + batch_groesse]
+        for start in range(0, len(zu_kategorisieren), batch_groesse)
     ]
     gesamt_batches = max(1, len(batches))
     erledigt = [0]
@@ -69,18 +102,29 @@ def kategorisiere(
         ]
         return kategorisierer.klassifiziere(posten)
 
+    def setze(aid, gruppe, unsicher):
+        if aid not in original or aid in ergebnis:
+            return
+        ergebnis[aid] = KategorisiertesAngebot(
+            angebot=original[aid], gruppe=gruppe, unsicher=unsicher
+        )
+
     def uebernehmen(antworten):
         with lock:
             for ant in antworten:
                 aid = ant.get("id")
-                if aid not in original or aid in ergebnis:
-                    continue  # fremde/duplizierte ID ignorieren
                 gruppe, unsicher = _bereinige_gruppe(
                     ant.get("gruppe"), ant.get("unsicher")
                 )
-                ergebnis[aid] = KategorisiertesAngebot(
-                    angebot=original[aid], gruppe=gruppe, unsicher=unsicher
-                )
+                schluessel = schluessel_von_repr.get(aid)
+                if schluessel is not None:
+                    # Repräsentant -> Ergebnis auf ALLE Angebote desselben Produkts
+                    for ziel in aids_von_schluessel[schluessel]:
+                        setze(ziel, gruppe, unsicher)
+                    if not unsicher:
+                        neu_fuer_cache[schluessel] = gruppe
+                else:
+                    setze(aid, gruppe, unsicher)
             erledigt[0] += 1
             if fortschritt is not None:
                 fortschritt(erledigt[0], gesamt_batches)
@@ -95,6 +139,16 @@ def kategorisiere(
     else:
         for batch in batches:
             uebernehmen(verarbeite(batch))
+
+    # Write-Back: neue, SICHERE Zuordnungen in den Cache (ein executemany).
+    if cache is not None and neu_fuer_cache:
+        cache.schreibe_viele(
+            [(s, g, modell_name) for s, g in neu_fuer_cache.items()]
+        )
+
+    if statistik is not None:
+        statistik["aus_cache"] = aus_cache
+        statistik["neu"] = len(zu_kategorisieren)
 
     # Posten, die das Modell nicht (gültig) beantwortet hat: ehrlich als
     # unsicher mit Fallback markieren -- nicht still einsortieren.

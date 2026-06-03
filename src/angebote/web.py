@@ -234,6 +234,7 @@ def _run_kategorisieren(job_id, plz, fetch, modell, anbieter, key) -> None:
     job = _jobs[job_id]
     try:
         from .kategorisieren import baue_kategorisierer, kategorisiere
+        from .produktcache import ProduktCache
         from .uebersicht import als_struktur
 
         kt = baue_kategorisierer(anbieter, modell, api_key=key)
@@ -252,15 +253,21 @@ def _run_kategorisieren(job_id, plz, fetch, modell, anbieter, key) -> None:
             if done == total or done % 5 == 0:  # nicht jede Batch -> Log lesbar
                 print(f"[Stufe 2] PLZ {plz} · Batch {done}/{total}", flush=True)
 
-        kat = kategorisiere(list(fetch.angebote), kt, fortschritt=fort)
+        cache = ProduktCache()  # Produkt->Kategorie-Cache: bekannte Produkte ohne LLM
+        stat: dict = {}
+        kat = kategorisiere(
+            list(fetch.angebote), kt, fortschritt=fort, cache=cache, statistik=stat
+        )
 
         job["ergebnis"] = als_struktur(
-            fetch, kat, modell=modell_genutzt, anbieter=anbieter
+            fetch, kat, modell=modell_genutzt, anbieter=anbieter,
+            aus_cache=stat.get("aus_cache"), neu=stat.get("neu"),
         )
         job["status"] = "fertig"
         _ergebnis_cache[(plz, anbieter, modell)] = job["ergebnis"]
         print(
-            f"[Stufe 2] fertig · PLZ {plz} · {job['ergebnis']['unsicher']} unsicher",
+            f"[Stufe 2] fertig · PLZ {plz} · {stat.get('aus_cache', 0)} aus Cache · "
+            f"{stat.get('neu', 0)} neu · {job['ergebnis']['unsicher']} unsicher",
             flush=True,
         )
     except AbbruchFehler as e:

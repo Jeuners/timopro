@@ -37,6 +37,24 @@ class FakeKategorisierer:
         return self._fn(posten)
 
 
+class CountingFakeKategorisierer:
+    """Zählt die ans LLM gegebenen Posten -- für Cache-Tests (Hit/Dedup)."""
+
+    def __init__(self, gruppe: str = "Sonstiges", unsicher: bool = False):
+        self.gesehen = 0
+        self.titel: list[str] = []
+        self._gruppe = gruppe
+        self._unsicher = unsicher
+
+    def klassifiziere(self, posten: list[dict]) -> list[dict]:
+        self.gesehen += len(posten)
+        self.titel.extend(p["titel"] for p in posten)
+        return [
+            {"id": p["id"], "gruppe": self._gruppe, "unsicher": self._unsicher}
+            for p in posten
+        ]
+
+
 def beispiel_angebot(titel="Butter", **kw) -> Angebot:
     """Belegtes Angebot mit Default-Pflichtfeldern; einzeln überschreibbar."""
     daten = dict(

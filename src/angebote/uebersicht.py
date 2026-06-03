@@ -47,6 +47,8 @@ def als_struktur(
     *,
     modell: str | None = None,
     anbieter: str | None = None,
+    aus_cache: int | None = None,
+    neu: int | None = None,
 ) -> dict:
     """Strukturierte Ausgabe für die Web-UI -- dieselben belegten Felder wie der
     Markdown-Renderer, nur als JSON-fähiges dict. Leere Gruppen bleiben enthalten
@@ -62,6 +64,8 @@ def als_struktur(
         "unsicher": sum(1 for k in kategorisiert if k.unsicher),
         "modell": modell,
         "anbieter": anbieter,
+        "aus_cache": aus_cache,
+        "neu": neu,
         "quellen": list(fetch.abgedeckte_quellen),
         "haendler": list(fetch.gesehene_haendler),
         "hinweise": list(fetch.hinweise),

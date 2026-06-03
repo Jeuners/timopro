@@ -55,6 +55,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="vor dem Lauf das OpenRouter-Modell interaktiv wählen (Liste/Suche/Update)",
     )
+    parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        help="den Produkt->Kategorie-Cache nicht nutzen (alles neu kategorisieren)",
+    )
     args = parser.parse_args(argv)
 
     # Reiner Listen-/Suchmodus -- braucht keinen Ort und keinen Key.
@@ -102,12 +107,28 @@ def main(argv: list[str] | None = None) -> int:
     from .kategorisieren import baue_kategorisierer, kategorisiere
     from .uebersicht import rendern
 
+    cache = None
+    if not args.no_cache:
+        from .produktcache import ProduktCache
+
+        cache = ProduktCache()
+    stat: dict = {}
     try:
-        kat = kategorisiere(list(fetch.angebote), baue_kategorisierer(anbieter, modell))
+        kat = kategorisiere(
+            list(fetch.angebote),
+            baue_kategorisierer(anbieter, modell),
+            cache=cache,
+            statistik=stat,
+        )
     except AbbruchFehler as e:
         print(e.als_text(), file=sys.stderr)
         return 2
 
+    if cache is not None:
+        print(
+            f"({stat.get('aus_cache', 0)} aus Cache · {stat.get('neu', 0)} neu kategorisiert)",
+            file=sys.stderr,
+        )
     print(rendern(fetch, kat))
     return 0
 

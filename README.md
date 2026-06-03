@@ -65,8 +65,18 @@ Reihenfolge:
 1. **Stufe 1 -- Rohdaten holen & speichern** (deterministisch, kein LLM, kein
    Key): Abruf für eine PLZ, Persistenz pro PLZ/Woche unter `data/roh/`. Die
    belegte Rohliste ist für sich ansehbar.
-2. **OpenRouter-Konfiguration** -- separates Panel (Key + Modellauswahl mit
-   Liste/Suche/Aktualisieren), gilt für Stufe 2.
+2. **LLM-Konfiguration** -- separates Panel mit **Anbieter-Umschalter**:
+   - **OpenRouter** (Cloud): Key + Modellauswahl (Liste/Suche/Aktualisieren).
+     Default `deepseek/deepseek-v4-flash` -- günstig (~1-2 Cent/Lauf), verlässlich.
+   - **Ollama** (lokal): zeigt die lokal installierten Modelle (kein Key, kein
+     Netz). Ehrlicher Hinweis: kleine lokale Modelle (3-9 B) liefern für diese
+     Batch-Aufgabe oft kein zuverlässiges Tool-Calling -- dann markiert das
+     System alles als „Sonstiges/unsicher" statt zu raten. Brauchbare lokale
+     Kategorisierung braucht ein starkes tool-fähiges Modell.
+
+   Anbieter + Modell werden gemerkt (`localStorage`) und überleben einen Reload.
+   Das gewählte Modell ist dauerhaft sichtbar (Chip im Kopf + im Ergebnis:
+   „kategorisiert mit … (anbieter)").
 3. **Stufe 2 -- Kategorisieren** (LLM): läuft **nur auf den gespeicherten
    Rohdaten** und ist gesperrt, solange keine vorliegen. Ergebnis ist die nach
    Produktgruppen gruppierte Übersicht mit Filtern, Unsicherheits-Markierung
@@ -96,11 +106,13 @@ ist als **Single-User-Werkzeug für localhost** gedacht -- nicht mit
 - `requirements.txt` -- **vorhanden**.
 - `src/angebote/` -- **vorhanden**: Datenmodell, Adapter-Schnittstelle,
   Fetch-Orchestrator, Kategorisier-Schritt, Übersicht-Renderer, CLI.
-- `tests/` -- **47 Tests**: Architektur-Regeln (kein Auffüllen, Abbruch bei
+- `tests/` -- **57 Tests**: Architektur-Regeln (kein Auffüllen, Abbruch bei
   leerem/unauflösbarem Ort, Daten-Integrität nach Kategorisierung,
   geschlossene Kategorienliste, Unsicherheits-Flag, Schnitt-Test "kein LLM im
-  Fetch-Teil"), Modell-Discovery/-Auswahl, Anbieter-/Retry-Logik, Rohdaten-
-  Persistenz und die Web-Endpoints. Laufen offline, ohne Netz und ohne LLM.
+  Fetch-Teil"), Modell-Discovery/-Auswahl (OpenRouter + Ollama), Anbieter-/
+  Retry-Logik, content-JSON-Fallback, Rohdaten-Persistenz und die Web-Endpoints.
+  Laufen offline; ein E2E-Test (Playwright) prüft die Konfig-Persistenz im
+  Browser.
 - **Web-UI + zweistufiger Flow** -- vorhanden und live verifiziert: Stufe 1
   (Fetch + Speichern) und Stufe 2 (LLM-Kategorisierung auf den gespeicherten
   Rohdaten, gesperrt bis Daten da sind) end-to-end gegen PLZ 60487 getestet.
@@ -148,6 +160,6 @@ src/angebote/                              Implementierung
   web.py           FastAPI-Web-UI (Stufe-1-/Stufe-2-Endpoints)
   web_static/      Frontend (index.html)
   cli.py / __main__.py  CLI-Einstieg
-tests/                                     47 Architektur-/Web-Tests
+tests/                                     57 Architektur-/Web-/E2E-Tests
 data/roh/                                  generierte Rohdaten (ge-ignored)
 ```

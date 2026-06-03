@@ -225,6 +225,76 @@ def api_status(job_id: str) -> dict:
     return job
 
 
+# === Manuelle Korrektur -> Produkt-Cache (die hochwertigste Cache-Quelle) =====
+
+
+@app.post("/api/korrektur")
+def api_korrektur(req: dict) -> dict:
+    """Setzt die Produktgruppe eines Produkts manuell und dauerhaft.
+
+    Schnitt-konform: betrifft NUR die Kategorie (Cache-Seite), nie Angebotsdaten;
+    ruft KEIN LLM und fetcht nicht. Geschlossene Liste wird erzwungen. Die
+    Zuordnung (modell='manuell') überschreibt im Produkt-Cache jeden früheren
+    LLM-Wert -- dieses Produkt ist damit künftig sicher und LLM-frei.
+    """
+    from .config import PRODUKTGRUPPEN
+    from .produktcache import ProduktCache, produkt_schluessel
+
+    titel = (req.get("titel") or "").strip()
+    marke = req.get("marke")  # darf None/"" sein -- Teil der Produkt-Identität
+    gruppe = (req.get("gruppe") or "").strip()
+
+    if not titel:
+        raise HTTPException(status_code=400, detail="Titel fehlt")
+    if gruppe not in PRODUKTGRUPPEN:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unbekannte Produktgruppe '{gruppe}' -- nur die geschlossene "
+            "Liste ist erlaubt.",
+        )
+
+    schluessel = produkt_schluessel(titel, marke)
+    geschrieben = ProduktCache().schreibe_viele([(schluessel, gruppe, "manuell")])
+
+    plz = (req.get("plz") or "").strip()
+    if plz:
+        _patche_ergebnis_cache(plz, schluessel, gruppe)
+
+    return {"schluessel": schluessel, "gruppe": gruppe, "gespeichert": bool(geschrieben)}
+
+
+def _patche_ergebnis_cache(plz: str, schluessel: str, ziel_gruppe: str) -> None:
+    """Hält die zwischengespeicherte UI-Struktur konsistent mit der Korrektur:
+    hängt alle Angebote mit passendem Produkt-Schlüssel in die Zielgruppe um,
+    setzt unsicher=False und aktualisiert Counts. Verschiebt nur die Kategorie --
+    keine Neukategorisierung, kein Fetch."""
+    from .produktcache import produkt_schluessel
+
+    for key, erg in _ergebnis_cache.items():
+        if key[0] != plz:
+            continue
+        gruppen = erg.get("gruppen", [])
+        zielblock = next((g for g in gruppen if g["name"] == ziel_gruppe), None)
+        if zielblock is None:
+            continue
+        bewegt = []
+        for block in gruppen:
+            bleibt = []
+            for a in block["angebote"]:
+                if produkt_schluessel(a["titel"], a.get("marke")) == schluessel:
+                    a["unsicher"] = False
+                    bewegt.append(a)
+                else:
+                    bleibt.append(a)
+            block["angebote"] = bleibt
+        zielblock["angebote"].extend(bewegt)
+        for g in gruppen:
+            g["anzahl"] = len(g["angebote"])
+        erg["unsicher"] = sum(
+            1 for g in gruppen for a in g["angebote"] if a.get("unsicher")
+        )
+
+
 def _run_kategorisieren(job_id, plz, fetch, modell, anbieter, key) -> None:
     """LLM-Schritt im Hintergrund. Arbeitet auf den geladenen Rohdaten.
 

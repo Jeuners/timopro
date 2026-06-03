@@ -58,6 +58,22 @@ Diese drei Punkte sind der Grund, warum "die KI soll sagen, wenn sie scheitert"
 hier funktioniert: nicht weil das Modell Einsicht hätte, sondern weil eine
 externe, prüfbare Bedingung es erzwingt.
 
+## Sichtbarkeit der LLM-Arbeit (Grundregel)
+
+So wie das System **sichtbar abbricht**, wenn es scheitert, muss es auch
+**sichtbar zeigen**, wenn es arbeitet. Jede LLM-Aktion (die Kategorisierung)
+wird in der Oberfläche als *laufende Aktivität* dargestellt: erkennbarer
+Fortschritt (z. B. „LLM kategorisiert … Batch X/Y"), ein animierter Indikator,
+und das auslösende Bedien-Element im Lade-Zustand. Eine LLM-Aktion darf **nie**
+wie ein eingefrorenes, totes UI aussehen.
+
+Der Grund ist derselbe wie beim Abbruch: Transparenz. Der Nutzer muss jederzeit
+zwischen „arbeitet gerade" und „hängt / ist fertig" unterscheiden können -- sonst
+wirkt selbst ein korrekt laufender Prozess wie ein Defekt. Das gilt für die
+Web-UI (animierter Status + Fortschrittsbalken) ebenso wie für die CLI (laufende
+Status-/Batch-Zeile). Deterministische Schritte (Fetch) dürfen still sein; die
+LLM-Schritte nicht.
+
 ## Skills
 
 Das Projekt nutzt zwei Skills (in `.claude/skills/`), die exakt dem Schnitt

@@ -203,27 +203,23 @@
 
   .sep { color:var(--faint); }
 
-  /* --- Ergebnis-Layout: Sidebar + sticky Header --- */
-  .ergebnis-layout { display:grid; grid-template-columns:248px minmax(0,1fr); gap:var(--s6); align-items:start; }
-  aside.sidebar {
-    position:sticky; top:var(--s4); align-self:start; max-height:calc(100vh - var(--s8)); overflow:auto;
-    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:var(--s3);
-  }
-  .sidebar-head { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:700; padding:var(--s2) var(--s3) var(--s3); }
-  nav#gruppennav { display:flex; flex-direction:column; gap:2px; }
-  .navitem {
-    display:flex; justify-content:space-between; align-items:center; gap:var(--s3);
-    width:100%; text-align:left; padding:8px var(--s3); border-radius:var(--radius-sm);
-    background:transparent; color:var(--ink-2); border:1px solid transparent; font-weight:500; font-size:14px; min-height:0; cursor:pointer;
-    transition:background .15s, color .15s;
-  }
-  .navitem:hover { background:var(--panel-2); transform:none; box-shadow:none; color:var(--ink); }
-  .navitem.aktiv { background:var(--brand-weak); color:var(--brand-d); border-color:#cfe3d9; font-weight:600; }
-  .navitem .nav-cnt { font-variant-numeric:tabular-nums; color:var(--muted); font-size:13px; }
-  .navitem .nav-uns { font-size:11px; color:var(--warn); border:1px solid var(--warn-line); background:var(--warn-bg); border-radius:5px; padding:0 6px; margin-left:6px; }
+  /* --- Ergebnis: sticky Header mit horizontalem Gruppen-Band --- */
   header.ergebnis-header { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:var(--s2); padding-bottom:var(--s3); margin-bottom:var(--s4); border-bottom:1px solid var(--line); }
   header.ergebnis-header .summary { margin-bottom:var(--s3); }
-  header.ergebnis-header .filters { margin-bottom:0; }
+  header.ergebnis-header .filters { margin-bottom:var(--s3); }
+  nav.gruppenband { display:flex; gap:6px; overflow-x:auto; padding:2px 0; scrollbar-width:thin; }
+  .navitem {
+    flex:none; display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
+    padding:6px 12px; border-radius:999px; min-height:0; cursor:pointer;
+    background:var(--panel); color:var(--ink-2); border:1px solid var(--line);
+    font-weight:500; font-size:13px;
+    transition:background .15s, color .15s, border-color .15s;
+  }
+  .navitem:hover { background:var(--panel-2); transform:none; box-shadow:none; color:var(--ink); border-color:var(--faint); }
+  .navitem.aktiv { background:var(--brand-weak); color:var(--brand-d); border-color:#cfe3d9; font-weight:600; }
+  .navitem .nav-cnt { font-variant-numeric:tabular-nums; color:var(--muted); font-size:12px; }
+  .navitem.aktiv .nav-cnt { color:var(--brand-d); }
+  .navitem .nav-uns { font-size:10px; color:var(--warn); border:1px solid var(--warn-line); background:var(--warn-bg); border-radius:5px; padding:0 5px; font-weight:700; }
   .kfeedback { font-size:13px; color:var(--brand-d); font-weight:600; height:0; overflow:hidden; transition:height .2s; }
   .kfeedback.an { height:22px; margin-top:var(--s2); }
 
@@ -232,13 +228,6 @@
   .ang .gchip:hover { border-color:var(--brand); color:var(--brand-d); }
   .ang.unsicher .gchip { border-color:var(--warn-line); background:var(--warn-bg); color:var(--warn); }
   .ang .ksel { font-size:12px; padding:2px 6px; border:1px solid var(--brand); border-radius:6px; margin-left:7px; vertical-align:middle; }
-
-  @media (max-width:860px){
-    .ergebnis-layout { grid-template-columns:1fr; }
-    aside.sidebar { position:static; max-height:none; order:-1; }
-    nav#gruppennav { flex-direction:row; flex-wrap:wrap; }
-    .navitem { width:auto; }
-  }
 </style>
 </head>
 <body>
@@ -348,25 +337,18 @@
 
   <!-- ============ ERGEBNIS ============ -->
   <div id="result" hidden>
-    <div class="ergebnis-layout">
-      <aside class="sidebar">
-        <div class="sidebar-head">Produktgruppen</div>
-        <nav id="gruppennav"></nav>
-      </aside>
-      <div class="main">
-        <header class="ergebnis-header">
-          <div class="summary" id="summary"></div>
-          <div class="filters">
-            <div class="field"><label for="fhaendler">Händler</label><select id="fhaendler"><option value="">alle</option></select></div>
-            <div class="field"><label for="ftext">Angebot suchen</label><input id="ftext" type="text" placeholder="Titel…" /></div>
-            <div class="field check"><input id="fsicher" type="checkbox" /><label for="fsicher">nur sichere</label></div>
-          </div>
-          <div id="korrektur-feedback" class="kfeedback"></div>
-        </header>
-        <div id="gruppen"></div>
-        <footer class="note" id="footer"></footer>
+    <header class="ergebnis-header">
+      <div class="summary" id="summary"></div>
+      <div class="filters">
+        <div class="field"><label for="fhaendler">Händler</label><select id="fhaendler"><option value="">alle</option></select></div>
+        <div class="field"><label for="ftext">Angebot suchen</label><input id="ftext" type="text" placeholder="Titel…" /></div>
+        <div class="field check"><input id="fsicher" type="checkbox" /><label for="fsicher">nur sichere</label></div>
       </div>
-    </div>
+      <nav id="gruppennav" class="gruppenband" aria-label="Produktgruppen"></nav>
+      <div id="korrektur-feedback" class="kfeedback"></div>
+    </header>
+    <div id="gruppen"></div>
+    <footer class="note" id="footer"></footer>
   </div>
 </div>
 
@@ -612,7 +594,7 @@ function render(){
   fh.innerHTML = "<option value=''>alle</option>" + d.haendler.map(h => `<option>${esc(h)}</option>`).join("");
   fh.value = aktuell;
 
-  zeichneGruppen();  // baut Sektionen + ruft baueSidebar mit den gefilterten Counts
+  zeichneGruppen();  // baut Sektionen + füllt das Gruppen-Band mit den Counts
 
   $("#footer").innerHTML =
     `<span class="haendler"><b>Beobachtete Händler (belegt):</b> ${d.haendler.map(esc).join(", ")}.</span>` +
@@ -655,18 +637,18 @@ function zeichneGruppen(){
     }
     box.appendChild(sec);
   }
-  baueSidebar(navDaten);
+  baueGruppenband(navDaten);
 }
 
-function baueSidebar(navDaten){
+function baueGruppenband(navDaten){
   const nav = $("#gruppennav");
   nav.innerHTML = "";
-  if (!navDaten.length){ nav.innerHTML = `<div class="navitem" style="cursor:default;color:var(--muted)">keine Treffer</div>`; return; }
+  if (!navDaten.length){ nav.innerHTML = `<span class="navitem" style="cursor:default;color:var(--muted)">keine Treffer</span>`; return; }
   for (const g of navDaten){
     const b = document.createElement("button");
     b.className = "navitem"; b.dataset.grp = g.name;
-    const uns = g.uns ? `<span class="nav-uns">${g.uns}</span>` : "";
-    b.innerHTML = `<span>${esc(g.name)}</span><span><span class="nav-cnt">${g.count}</span>${uns}</span>`;
+    const uns = g.uns ? ` <span class="nav-uns" title="${g.uns} unsicher">${g.uns}</span>` : "";
+    b.innerHTML = `<span>${esc(g.name)}</span><span class="nav-cnt">${g.count}</span>${uns}`;
     b.onclick = () => springeZu(g.name);
     nav.appendChild(b);
   }

@@ -357,6 +357,14 @@ const $ = s => document.querySelector(s);
 let DATEN = null;        // kategorisiertes Ergebnis (Stufe 2)
 let ROHDA = false;       // ob für die aktuelle PLZ Rohdaten vorliegen
 
+// Pfad-Basis: lokal "/", hinter einem Reverse-Proxy z.B. "/angebote/".
+// Macht die API-Aufrufe pfad-agnostisch -- absolute /api/-Pfade würden unter
+// einem Unterpfad sonst ins Leere zeigen (404).
+const BASE = location.pathname.endsWith("/")
+  ? location.pathname
+  : location.pathname.replace(/[^/]*$/, "");
+const api = p => BASE + String(p).replace(/^\//, "");
+
 function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function preisFmt(p){ return p!=null ? p.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €" : "Preis fehlt"; }
 function setRohStatus(html){ $("#rohstatus").innerHTML = html; }
@@ -400,7 +408,7 @@ async function ladeModelle(q=""){
   const url = ab === "ollama" ? "/api/ollama-modelle" : ("/api/modelle?q=" + encodeURIComponent(q));
   sel.innerHTML = "<option>lädt…</option>";
   try {
-    const r = await fetch(url);
+    const r = await fetch(api(url));
     if (!r.ok) throw new Error((await r.json()).detail || r.status);
     const liste = await r.json();
     sel.innerHTML = "";
@@ -494,7 +502,7 @@ async function pruefeRohstand(plz){
   lockStage2();
   if (!/^\d{5}$/.test(plz)) return;
   try {
-    const r = await fetch("/api/rohdaten/" + encodeURIComponent(plz));
+    const r = await fetch(api("/api/rohdaten/" + encodeURIComponent(plz)));
     // Stale-Guard: zwischenzeitlich getippte/andere PLZ -> Antwort verwerfen.
     if ($("#plz").value.trim() !== plz) return;
     if (r.status === 404) { lockStage2("Noch keine Rohdaten für diese PLZ — Stufe 1 ausführen."); return; }
@@ -512,7 +520,7 @@ async function holeRohdaten(){
   $("#result").hidden = true; DATEN = null;
   setRohStatus(`<div class="pending">Hole Angebote für <b>${esc(plz)}</b> … (deterministisch, ohne LLM)</div>`);
   try {
-    const r = await fetch("/api/rohdaten", {
+    const r = await fetch(api("/api/rohdaten"), {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ plz })
     });
@@ -538,7 +546,7 @@ async function kategorisiere(){
 
   let job;
   try {
-    const r = await fetch("/api/kategorisieren", {
+    const r = await fetch(api("/api/kategorisieren"), {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
         plz, modell: $("#modell").value, anbieter: anbieter(),
@@ -554,7 +562,7 @@ async function kategorisiere(){
 
   const poll = setInterval(async () => {
     let s;
-    try { s = await (await fetch("/api/lauf/" + job)).json(); }
+    try { s = await (await fetch(api("/api/lauf/" + job))).json(); }
     catch { return; }
     if (s.status === "laufend"){
       if (s.total){
@@ -702,7 +710,7 @@ function oeffneKorrektur(chip, a, vonGruppe){
 async function korrigiere(a, vonGruppe, zielGruppe){
   if (zielGruppe === vonGruppe){ render(); return; }
   try {
-    const r = await fetch("/api/korrektur", {
+    const r = await fetch(api("/api/korrektur"), {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({ titel:a.titel, marke:a.marke, gruppe:zielGruppe, plz:$("#plz").value.trim() })
     });

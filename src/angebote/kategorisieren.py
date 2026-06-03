@@ -328,9 +328,14 @@ class OpenRouterKategorisierer:
             return []
 
 
+# Default je Anbieter. Für OpenRouter ein günstiges, aber verlässliches paid-
+# Modell: deepseek-v4-flash macht sauberes Tool-Calling, ist über mehrere
+# Batches konsistent und kostet nur ~1-2 Cent pro vollem Lauf (1903 Angebote).
+# Free-Modelle sind bei OpenRouter oft hart gedrosselt; mit `--modell` (CLI) bzw.
+# der Modellauswahl in der Web-UI lässt sich jederzeit ein anderes wählen.
 _DEFAULT_MODELLE = {
     "anthropic": "claude-sonnet-4-6",
-    "openrouter": "anthropic/claude-sonnet-4.6",
+    "openrouter": "deepseek/deepseek-v4-flash",
 }
 
 

@@ -3,260 +3,359 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#0e5d42" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#13120d" media="(prefers-color-scheme: dark)" />
 <title>Angebots-Übersicht</title>
 <style>
+  /* ============================================================
+     Farb-Tokens — AAA-verifiziert (jedes Text-Paar >=7:1,
+     Steuer-Ränder >=3:1). Hell als Default, Dunkel adaptiv.
+     ============================================================ */
   :root {
-    /* warme Neutral-Skala (kein reines Grau) */
-    --bg:#f4f2ee; --panel:#ffffff; --panel-2:#faf9f6;
-    --ink:#1b1a17; --ink-2:#3c3a35; --muted:#76726b; --faint:#a39e95;
-    --line:#e5e0d8; --line-2:#efebe3;
-    --brand:#1f6f53; --brand-d:#185b44; --brand-weak:#e7f1ec;
-    --accent:#9a6a00; --warn:#9a6a00; --warn-bg:#fbf2dd; --warn-line:#ecd49a;
-    --err:#9c2a23; --err-bg:#fbeeec; --err-line:#e6b8b2;
+    --bg:#f4f2ee; --panel:#ffffff; --panel-2:#f6f4ef; --panel-3:#efece4;
+    --ink:#161510; --ink-2:#2f2d26; --muted:#504d45;
+    --brand:#0e5d42; --brand-text:#0c5238; --on-brand:#ffffff;
+    --brand-weak:#eef5f1; --brand-weak-line:#cfe3d9;
+    --warn:#684500; --warn-bg:#f8efd6; --warn-line:#e6cf97;
+    --err:#8a231d; --err-bg:#fbeae8; --err-line:#e6b8b2;
     --price:#11221b;
-    /* Spacing-Skala 4/8/12/16/24/32/48 */
+    --line:#e3ded5; --line-2:#eceae2; --ctrl:#8a8474;
+    --focus:#0e5d42;
     --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px; --s8:32px; --s12:48px;
-    --radius:14px; --radius-sm:9px;
+    --radius:16px; --radius-sm:11px; --radius-pill:999px;
+    --appbar-h:60px;
     --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-    --shadow-sm:0 1px 2px rgba(30,26,20,.05);
-    --shadow-md:0 6px 18px -6px rgba(30,26,20,.12);
+    --shadow-sm:0 1px 2px rgba(20,18,12,.06);
+    --shadow-md:0 10px 30px -12px rgba(20,18,12,.22);
+    --shadow-lg:0 20px 50px -20px rgba(20,18,12,.30);
+    --ring:0 0 0 3px var(--brand-weak), 0 0 0 1.5px var(--brand);
   }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#13120d; --panel:#1d1b15; --panel-2:#23211a; --panel-3:#2a2820;
+      --ink:#f2efe7; --ink-2:#d6d2c6; --muted:#cbc6b7;
+      --brand:#3db188; --brand-text:#6cd2a4; --on-brand:#06130c;
+      --brand-weak:#18352a; --brand-weak-line:#2c5a47;
+      --warn:#f4cf86; --warn-bg:#3a2f12; --warn-line:#5c4a1e;
+      --err:#f0a59c; --err-bg:#3a1f1c; --err-line:#5e2e2a;
+      --price:#eaf7f0;
+      --line:#2e2c24; --line-2:#272519; --ctrl:#767161;
+      --focus:#6cd2a4;
+      --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+      --shadow-md:0 12px 32px -14px rgba(0,0,0,.6);
+      --shadow-lg:0 24px 56px -22px rgba(0,0,0,.7);
+      --ring:0 0 0 3px rgba(108,210,164,.28), 0 0 0 1.5px var(--brand-text);
+    }
+  }
+
   * { box-sizing:border-box; }
+  html { scroll-padding-top: calc(var(--appbar-h) + var(--s4)); }
   body {
     margin:0; background:var(--bg); color:var(--ink);
     font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     -webkit-font-smoothing:antialiased; letter-spacing:-.003em;
   }
-  @media (prefers-reduced-motion: reduce) { * { transition-duration:.01ms !important; } }
+  @media (prefers-reduced-motion: reduce) { *,*::before,*::after { transition-duration:.01ms !important; animation-duration:.01ms !important; } }
 
-  header.top {
-    padding:var(--s8) var(--s6) var(--s6); border-bottom:1px solid var(--line);
-    background:var(--panel);
+  /* sichtbarer Fokus — überall, kräftig (WCAG 2.4.13/2.4.11) */
+  :focus { outline:none; }
+  :focus-visible { outline:none; box-shadow:var(--ring); border-radius:var(--radius-sm); }
+  a { color:var(--brand-text); }
+
+  /* ============ App-Bar (sticky, gibt App-Identität) ============ */
+  .appbar {
+    position:sticky; top:0; z-index:50; height:var(--appbar-h);
+    background:color-mix(in srgb, var(--panel) 86%, transparent);
+    -webkit-backdrop-filter:saturate(1.4) blur(10px); backdrop-filter:saturate(1.4) blur(10px);
+    border-bottom:1px solid var(--line);
   }
-  .top-inner { max-width:1180px; margin:0 auto; }
-  header.top .eyebrow {
-    font-size:12px; text-transform:uppercase; letter-spacing:.16em;
-    color:var(--brand); font-weight:700; margin:0 0 var(--s2);
+  .appbar-inner { max-width:1100px; margin:0 auto; height:100%; padding:0 var(--s6);
+    display:flex; align-items:center; gap:var(--s3); }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:17px;
+    letter-spacing:-.02em; color:var(--ink); text-decoration:none; }
+  .brand .logo {
+    width:34px; height:34px; border-radius:10px; flex:none; display:grid; place-items:center;
+    background:linear-gradient(145deg,var(--brand),color-mix(in srgb,var(--brand) 70%, #000 12%));
+    color:var(--on-brand); font-size:18px; box-shadow:var(--shadow-sm);
   }
-  header.top h1 {
-    margin:0; font-size:clamp(1.7rem,2.6vw,2.3rem); line-height:1.08;
-    letter-spacing:-.025em; font-weight:700;
+  .appbar .place {
+    margin-left:6px; display:inline-flex; align-items:center; gap:6px;
+    font-size:13px; font-weight:700; color:var(--brand-text);
+    background:var(--brand-weak); border:1px solid var(--brand-weak-line);
+    padding:5px 11px; border-radius:var(--radius-pill); font-variant-numeric:tabular-nums;
   }
-  header.top p { margin:var(--s3) 0 0; color:var(--muted); font-size:15px; max-width:68ch; text-wrap:pretty; }
+  .appbar .place.leer { color:var(--muted); background:var(--panel-2); border-color:var(--line); }
+  .appbar .spacer { flex:1; }
+  .appbar .iconbtn {
+    width:40px; height:40px; border-radius:11px; border:1px solid var(--line);
+    background:var(--panel); color:var(--ink-2); display:grid; place-items:center;
+    cursor:pointer; font-size:17px; padding:0; min-height:0;
+  }
+  .appbar .iconbtn:hover { background:var(--panel-2); border-color:var(--ctrl); transform:none; box-shadow:none; }
 
-  .wrap { max-width:1180px; margin:0 auto; padding:var(--s8) var(--s6) var(--s12); }
+  /* ============ Intro ============ */
+  .intro { max-width:1100px; margin:0 auto; padding:var(--s8) var(--s6) 0; }
+  .intro .eyebrow {
+    font-size:12px; text-transform:uppercase; letter-spacing:.14em;
+    color:var(--brand-text); font-weight:800; margin:0 0 var(--s2);
+  }
+  .intro h1 { margin:0; font-size:clamp(1.8rem,3vw,2.5rem); line-height:1.05;
+    letter-spacing:-.03em; font-weight:800; }
+  .intro p { margin:var(--s3) 0 0; color:var(--muted); font-size:15.5px; max-width:64ch; text-wrap:pretty; }
 
-  /* Stufen-Anordnung */
-  .stages { display:grid; grid-template-columns:1fr; gap:var(--s6); }
+  .wrap { max-width:1100px; margin:0 auto; padding:var(--s6) var(--s6) var(--s12); }
+  .stages { display:grid; grid-template-columns:1fr; gap:var(--s4); }
 
+  /* ============ Stufen-Karten ============ */
   .stage {
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
     box-shadow:var(--shadow-sm); overflow:hidden;
+    transition:opacity .2s, box-shadow .2s;
   }
-  .stage.locked { opacity:.72; }
+  .stage.locked { opacity:.6; }
   .stage-head {
     display:flex; align-items:center; gap:var(--s4);
     padding:var(--s4) var(--s6); border-bottom:1px solid var(--line-2);
     background:linear-gradient(var(--panel),var(--panel-2));
   }
   .stage-num {
-    flex:none; width:30px; height:30px; border-radius:50%;
-    display:grid; place-items:center; font-weight:700; font-size:14px;
-    background:var(--brand); color:#fff; font-variant-numeric:tabular-nums;
+    flex:none; width:32px; height:32px; border-radius:10px;
+    display:grid; place-items:center; font-weight:800; font-size:15px;
+    background:var(--brand); color:var(--on-brand); font-variant-numeric:tabular-nums;
+    box-shadow:var(--shadow-sm);
   }
-  .stage.locked .stage-num { background:var(--faint); }
+  .stage.locked .stage-num { background:var(--ctrl); color:var(--panel); }
   .stage-titles { flex:1; min-width:0; }
-  .stage-titles h2 { margin:0; font-size:16px; font-weight:700; letter-spacing:-.01em; }
-  .stage-titles .sub { margin:2px 0 0; font-size:13px; color:var(--muted); }
+  .stage-titles h2 { margin:0; font-size:16.5px; font-weight:800; letter-spacing:-.015em; }
+  .stage-titles .sub { margin:3px 0 0; font-size:13px; color:var(--muted); }
   .stage-flag {
-    flex:none; font-size:11px; font-weight:600; letter-spacing:.04em;
-    text-transform:uppercase; padding:3px 9px; border-radius:999px;
-    background:var(--brand-weak); color:var(--brand-d); border:1px solid #cfe3d9;
+    flex:none; font-size:11px; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; padding:4px 10px; border-radius:var(--radius-pill);
+    background:var(--brand-weak); color:var(--brand-text); border:1px solid var(--brand-weak-line);
   }
-  .stage-flag.llm { background:#f0ecf7; color:#5a4a87; border-color:#ddd3ee; }
+  .stage-flag.llm { background:color-mix(in srgb, var(--brand-weak) 60%, var(--panel)); }
   .stage-body { padding:var(--s6); }
 
   .row { display:flex; flex-wrap:wrap; gap:var(--s4) var(--s6); align-items:end; }
-  .field { display:flex; flex-direction:column; gap:var(--s1); }
-  .field label { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field label { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:700; }
   input, select, button { font:inherit; }
   input[type=text], input[type=password], select {
-    padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm);
-    background:#fff; color:var(--ink); transition:border-color .15s, box-shadow .15s;
+    padding:11px 13px; border:1.5px solid var(--ctrl); border-radius:var(--radius-sm);
+    background:var(--panel); color:var(--ink); transition:border-color .15s, box-shadow .15s;
   }
-  input:focus, select:focus { outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak); }
-  input#plz { width:118px; font-variant-numeric:tabular-nums; font-size:18px; font-weight:600; letter-spacing:.04em; }
+  input::placeholder { color:var(--muted); opacity:1; }
+  input:focus-visible, select:focus-visible { box-shadow:var(--ring); border-color:var(--brand); }
+  input#plz { width:120px; font-variant-numeric:tabular-nums; font-size:19px; font-weight:800; letter-spacing:.06em; }
   select#modell { min-width:280px; }
-  input#modellsuche { width:150px; }
+  input#modellsuche { width:160px; }
 
   button {
-    padding:11px 20px; border:1px solid var(--brand); border-radius:var(--radius-sm);
-    background:var(--brand); color:#fff; cursor:pointer; font-weight:600; min-height:44px;
-    transition:transform .15s ease, background .15s, box-shadow .15s; white-space:nowrap;
+    padding:12px 22px; border:1.5px solid var(--brand); border-radius:var(--radius-sm);
+    background:var(--brand); color:var(--on-brand); cursor:pointer; font-weight:700; min-height:46px;
+    transition:transform .12s ease, filter .15s, box-shadow .15s; white-space:nowrap;
   }
-  button:hover:not(:disabled) { background:var(--brand-d); transform:translateY(-1px); box-shadow:var(--shadow-md); }
-  button.ghost { background:#fff; color:var(--brand); }
-  button.ghost:hover:not(:disabled) { background:var(--brand-weak); color:var(--brand-d); }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  button.icon { padding:10px 13px; }
+  button:hover:not(:disabled) { filter:brightness(1.06); transform:translateY(-1px); box-shadow:var(--shadow-md); }
+  button:active:not(:disabled) { transform:translateY(0); }
+  button.ghost { background:var(--panel); color:var(--brand-text); border-color:var(--ctrl); }
+  button.ghost:hover:not(:disabled) { background:var(--brand-weak); border-color:var(--brand); filter:none; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  button.icon { padding:11px 15px; }
 
-  .hint { font-size:12.5px; color:var(--muted); margin-top:var(--s3); }
-  .hint.lock { color:var(--accent); display:flex; align-items:center; gap:6px; }
+  .hint { font-size:13px; color:var(--muted); margin-top:var(--s3); max-width:70ch; }
+  .hint.lock { color:var(--warn); display:flex; align-items:center; gap:6px; font-weight:600; }
 
-  /* Roh-Stand-Anzeige */
-  .rohstand {
-    margin-top:var(--s4); padding:var(--s4); border:1px solid var(--line-2);
-    border-radius:var(--radius-sm); background:var(--panel-2);
-  }
-  .rohstand.ok { border-color:#cfe3d9; background:#f3f8f5; }
+  /* Roh-Stand */
+  .rohstand { margin-top:var(--s4); padding:var(--s4); border:1px solid var(--line-2);
+    border-radius:var(--radius-sm); background:var(--panel-2); }
+  .rohstand.ok { border-color:var(--brand-weak-line); background:var(--brand-weak); }
   .rohstand .line1 { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:baseline; }
-  .rohstand .ok-dot { color:var(--brand); font-weight:700; }
+  .rohstand .ok-dot { color:var(--brand-text); font-weight:800; }
   .rohstand b { color:var(--ink); }
   .rohstand .meta { color:var(--muted); font-size:13px; }
   .rohstand .haendler-tags { margin-top:var(--s3); display:flex; flex-wrap:wrap; gap:6px; }
-  .tag { font-size:12px; background:var(--brand-weak); color:var(--brand-d); padding:2px 9px; border-radius:999px; border:1px solid #d7e7df; }
+  .tag { font-size:12px; background:var(--panel); color:var(--ink-2); padding:3px 10px;
+    border-radius:var(--radius-pill); border:1px solid var(--line); font-weight:600; }
 
   details.rohliste { margin-top:var(--s3); }
-  details.rohliste > summary { cursor:pointer; font-size:13px; color:var(--brand-d); font-weight:600; user-select:none; padding:var(--s2) 0; }
+  details.rohliste > summary { cursor:pointer; font-size:13.5px; color:var(--brand-text); font-weight:700;
+    user-select:none; padding:var(--s2) var(--s2); border-radius:var(--radius-sm); display:inline-block; }
+  details.rohliste > summary:focus-visible { box-shadow:var(--ring); }
   .rohtable { width:100%; border-collapse:collapse; margin-top:var(--s2); font-size:13.5px; }
-  .rohtable th { text-align:left; font-weight:600; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:6px 10px; border-bottom:1px solid var(--line); }
-  .rohtable td { padding:7px 10px; border-bottom:1px solid var(--line-2); vertical-align:top; }
+  .rohtable th { text-align:left; font-weight:700; color:var(--muted); font-size:11px; text-transform:uppercase;
+    letter-spacing:.05em; padding:6px 10px; border-bottom:1px solid var(--line); }
+  .rohtable td { padding:8px 10px; border-bottom:1px solid var(--line-2); vertical-align:top; }
   .rohtable tr:last-child td { border-bottom:none; }
-  .rohtable .t-preis { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  .rohtable .t-preis { text-align:right; font-variant-numeric:tabular-nums; font-weight:700; white-space:nowrap; color:var(--price); }
   .rohtable .t-h { color:var(--muted); }
-  .rohtable .marke { color:var(--brand-d); font-weight:600; }
+  .rohtable .marke { color:var(--brand-text); font-weight:700; }
 
-  /* OpenRouter-Konfig (separater Bereich) */
-  .config {
-    border:1px dashed var(--line); border-radius:var(--radius); background:var(--panel-2);
-    margin:var(--s6) 0; overflow:hidden;
-  }
-  .config > summary {
-    cursor:pointer; user-select:none; list-style:none;
-    display:flex; align-items:center; gap:var(--s3);
-    padding:var(--s4) var(--s6); font-weight:700; font-size:15px;
-  }
+  /* LLM-Konfig */
+  .config { border:1px solid var(--line); border-radius:var(--radius); background:var(--panel);
+    box-shadow:var(--shadow-sm); overflow:hidden; }
+  .config > summary { cursor:pointer; user-select:none; list-style:none;
+    display:flex; align-items:center; gap:var(--s3); padding:var(--s4) var(--s6); font-weight:800; font-size:15px; }
   .config > summary::-webkit-details-marker { display:none; }
+  .config > summary:focus-visible { box-shadow:var(--ring); border-radius:var(--radius); }
   .config > summary .chev { transition:transform .2s; color:var(--muted); }
   .config[open] > summary .chev { transform:rotate(90deg); }
-  .config > summary .ico { font-size:14px; }
-  .config > summary .gewaehlt-chip {
-    margin-left:auto; font-size:12px; font-weight:600; color:var(--brand-d);
-    background:var(--brand-weak); border:1px solid #cfe3d9; border-radius:999px;
-    padding:2px 11px; max-width:46ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .config > summary .gilt { margin-left:var(--s3); font-weight:500; font-size:12px; color:var(--muted); }
+  .config > summary .ico { font-size:15px; }
+  .config > summary .gewaehlt-chip { margin-left:auto; font-size:12px; font-weight:700; color:var(--brand-text);
+    background:var(--brand-weak); border:1px solid var(--brand-weak-line); border-radius:var(--radius-pill);
+    padding:4px 12px; max-width:46ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .config > summary .gilt { margin-left:var(--s3); font-weight:600; font-size:12px; color:var(--muted); }
   .config-body { padding:0 var(--s6) var(--s6); border-top:1px solid var(--line-2); padding-top:var(--s4); }
   .keyrow { width:100%; max-width:560px; }
   .keyrow input { width:100%; }
 
   /* Status / Fortschritt */
-  #status { margin:var(--s4) 0 0; min-height:0; font-size:14.5px; }
-  #status:empty { margin:0; }
-  .bar { height:8px; background:var(--line); border-radius:5px; overflow:hidden; margin-top:var(--s2); max-width:420px; }
-  .bar > i { display:block; height:100%; width:0; background:var(--brand); transition:width .25s; }
-  .err {
-    background:var(--err-bg); border:1px solid var(--err-line); color:#6e201b;
+  #status, #rohstatus { margin:var(--s4) 0 0; font-size:14.5px; }
+  #status:empty, #rohstatus:empty { margin:0; }
+  .err { background:var(--err-bg); border:1px solid var(--err-line); color:var(--err);
     padding:var(--s4); border-radius:var(--radius-sm); white-space:pre-wrap;
-    font-family:var(--mono); font-size:13px; line-height:1.5;
-  }
+    font-family:var(--mono); font-size:13px; line-height:1.5; }
   .pending { color:var(--muted); }
 
-  /* LLM-Arbeit SICHTBAR machen (Grundregel: zeig, dass das Modell arbeitet) */
+  /* LLM-Arbeit SICHTBAR (Grundregel) */
   @keyframes llm-spin { to { transform:rotate(360deg); } }
   @keyframes llm-shimmer { 0%{background-position:-220px 0} 100%{background-position:220px 0} }
-  .llm-busy {
-    display:flex; align-items:center; gap:var(--s4); margin-top:var(--s3);
-    padding:var(--s4); border-radius:var(--radius);
-    background:var(--brand-weak); border:1px solid #cfe3d9;
-  }
-  .llm-busy .spin { flex:none; width:20px; height:20px; border:2.5px solid #c2dccf; border-top-color:var(--brand); border-radius:50%; animation:llm-spin .8s linear infinite; }
+  .llm-busy { display:flex; align-items:center; gap:var(--s4); margin-top:var(--s3);
+    padding:var(--s4); border-radius:var(--radius); background:var(--brand-weak); border:1px solid var(--brand-weak-line); }
+  .llm-busy .spin { flex:none; width:22px; height:22px; border:2.5px solid var(--brand-weak-line);
+    border-top-color:var(--brand); border-radius:50%; animation:llm-spin .8s linear infinite; }
   .llm-busy .txt { flex:1; min-width:0; }
-  .llm-busy .txt .hl { font-weight:700; color:var(--brand-d); }
-  .llm-busy .txt small { display:block; color:var(--brand); opacity:.9; font-size:12px; margin-top:1px; }
-  .llm-busy .bar2 { height:7px; border-radius:4px; background:#cfe3d9; overflow:hidden; margin-top:7px; }
-  .llm-busy .bar2 > i { display:block; height:100%; background:var(--brand); border-radius:4px; transition:width .3s; }
-  .llm-busy.indet .bar2 > i { width:40%; background:linear-gradient(90deg,#cfe3d9,var(--brand),#cfe3d9); background-size:220px 100%; animation:llm-shimmer 1.1s linear infinite; }
-  @media (prefers-reduced-motion: reduce){ .llm-busy .spin{ animation:none; } .llm-busy.indet .bar2 > i{ animation:none; } }
+  .llm-busy .txt .hl { font-weight:800; color:var(--brand-text); }
+  .llm-busy .txt small { display:block; color:var(--muted); font-size:12.5px; margin-top:2px; }
+  .llm-busy .bar2 { height:8px; border-radius:5px; background:var(--brand-weak-line); overflow:hidden; margin-top:8px; }
+  .llm-busy .bar2 > i { display:block; height:100%; background:var(--brand); border-radius:5px; transition:width .3s; }
+  .llm-busy.indet .bar2 > i { width:40%; background:linear-gradient(90deg,var(--brand-weak-line),var(--brand),var(--brand-weak-line));
+    background-size:220px 100%; animation:llm-shimmer 1.1s linear infinite; }
+  @media (prefers-reduced-motion: reduce){ .llm-busy .spin{ animation:none; } .llm-busy.indet .bar2 > i{ animation:none; width:100%; } }
 
-  /* Ergebnis (Stufe 2) */
+  /* ============ Ergebnis ============ */
   #result { margin-top:var(--s8); }
-  .summary { display:flex; flex-wrap:wrap; gap:var(--s2) var(--s6); align-items:baseline; color:var(--muted); font-size:14px; margin-bottom:var(--s4); }
-  .summary b { color:var(--ink); }
-  .filters {
-    display:flex; flex-wrap:wrap; gap:var(--s4) var(--s6); align-items:end;
+  header.ergebnis-header { position:sticky; top:var(--appbar-h); z-index:20; background:var(--bg);
+    padding-top:var(--s3); padding-bottom:var(--s3); margin-bottom:var(--s4); border-bottom:1px solid var(--line); }
+  .summary { display:flex; flex-wrap:wrap; gap:6px var(--s4); align-items:baseline; color:var(--muted);
+    font-size:14px; margin-bottom:var(--s3); }
+  .summary b { color:var(--ink); font-weight:700; }
+  .filters { display:flex; flex-wrap:wrap; gap:var(--s4) var(--s6); align-items:end;
     padding:var(--s4) var(--s6); background:var(--panel); border:1px solid var(--line);
-    border-radius:var(--radius); margin-bottom:var(--s6);
-  }
-  .check { flex-direction:row; align-items:center; gap:8px; }
-  .check label { text-transform:none; letter-spacing:0; font-size:14px; color:var(--ink); font-weight:400; }
+    border-radius:var(--radius); margin-bottom:var(--s3); box-shadow:var(--shadow-sm); }
+  .check { flex-direction:row; align-items:center; gap:9px; }
+  .check input { width:20px; height:20px; accent-color:var(--brand); }
+  .check label { text-transform:none; letter-spacing:0; font-size:14px; color:var(--ink); font-weight:600; }
 
-  section.grp { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:var(--s3); overflow:hidden; box-shadow:var(--shadow-sm); }
-  section.grp > h3 {
-    margin:0; padding:var(--s3) var(--s6); font-size:15px; font-weight:700; display:flex; justify-content:space-between;
-    align-items:center; cursor:pointer; background:linear-gradient(var(--panel),var(--panel-2)); border-bottom:1px solid var(--line-2);
-    letter-spacing:-.01em;
-  }
-  section.grp > h3 .cnt { color:var(--muted); font-weight:600; font-variant-numeric:tabular-nums; font-size:13px; }
+  /* Gruppen-Band */
+  nav.gruppenband { display:flex; gap:8px; overflow-x:auto; padding:4px 0; scrollbar-width:thin; }
+  .navitem { flex:none; display:inline-flex; align-items:center; gap:8px; white-space:nowrap;
+    padding:9px 15px; border-radius:var(--radius-pill); min-height:40px; cursor:pointer;
+    background:var(--panel); color:var(--ink-2); border:1px solid var(--line);
+    font-weight:700; font-size:13.5px; transition:background .15s, color .15s, border-color .15s; }
+  .navitem:hover { background:var(--panel-2); transform:none; box-shadow:none; color:var(--ink); border-color:var(--ctrl); filter:none; }
+  .navitem.aktiv { background:var(--brand-weak); color:var(--brand-text); border-color:var(--brand-weak-line); }
+  .navitem .nav-cnt { font-variant-numeric:tabular-nums; color:var(--muted); font-size:12.5px; font-weight:600; }
+  .navitem.aktiv .nav-cnt { color:var(--brand-text); }
+  .navitem .nav-uns { font-size:10.5px; color:var(--warn); border:1px solid var(--warn-line);
+    background:var(--warn-bg); border-radius:6px; padding:1px 6px; font-weight:800; }
+  .kfeedback { font-size:13.5px; color:var(--brand-text); font-weight:700; height:0; overflow:hidden; transition:height .2s; }
+  .kfeedback.an { height:24px; margin-top:var(--s2); }
+
+  /* Gruppen-Sektionen */
+  section.grp { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    margin-bottom:var(--s4); overflow:hidden; box-shadow:var(--shadow-sm); }
+  .grp-h { width:100%; margin:0; padding:0; border:none; background:transparent; cursor:pointer; }
+  .grp-h-btn { width:100%; display:flex; justify-content:space-between; align-items:center; gap:var(--s3);
+    padding:var(--s4) var(--s6); background:linear-gradient(var(--panel),var(--panel-2));
+    border:none; border-bottom:1px solid var(--line-2); border-radius:0; cursor:pointer;
+    font-size:15.5px; font-weight:800; letter-spacing:-.01em; color:var(--ink); min-height:0; }
+  .grp-h-btn:hover { filter:none; transform:none; box-shadow:none; background:var(--panel-2); }
+  .grp-h-btn:focus-visible { box-shadow:var(--ring); }
+  .grp-h-btn .left { display:flex; align-items:center; gap:10px; }
+  .grp-h-btn .dot { width:10px; height:10px; border-radius:50%; background:var(--brand); flex:none; }
+  .grp-h-btn .cnt { color:var(--muted); font-weight:700; font-variant-numeric:tabular-nums; font-size:13px;
+    display:inline-flex; align-items:center; gap:8px; }
+  .grp-h-btn .chev { color:var(--muted); transition:transform .2s; font-size:13px; }
+  section.grp.zu .grp-h-btn { border-bottom:none; }
+  section.grp.zu .grp-h-btn .chev { transform:rotate(-90deg); }
   section.grp.zu ul { display:none; }
-  section.grp.zu > h3 { border-bottom:none; }
   section.grp ul { list-style:none; margin:0; padding:var(--s1) 0; }
-  li.ang { display:grid; grid-template-columns:1fr auto; gap:2px var(--s4); padding:11px var(--s6); border-bottom:1px solid var(--line-2); align-items:baseline; }
+
+  li.ang { display:grid; grid-template-columns:1fr auto; gap:3px var(--s4); padding:13px var(--s6);
+    border-bottom:1px solid var(--line-2); align-items:baseline; }
   li.ang:last-child { border-bottom:none; }
-  .ang .name { font-weight:600; }
-  .ang .name .marke { color:var(--brand-d); }
-  .ang .meta { grid-column:1; color:var(--muted); font-size:13px; }
-  .ang .meta .haendler { color:var(--ink-2); background:var(--brand-weak); padding:1px 7px; border-radius:5px; font-weight:500; }
-  .ang .preis { grid-column:2; grid-row:1; text-align:right; font-weight:700; color:var(--price); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  li.ang:hover { background:var(--panel-2); }
+  .ang .name { font-weight:700; font-size:15px; color:var(--ink); }
+  .ang .name .marke { color:var(--brand-text); }
+  .ang .meta { grid-column:1; color:var(--muted); font-size:13px; display:flex; flex-wrap:wrap; align-items:center; gap:5px 9px; }
+  .ang .meta .haendler { color:var(--ink-2); background:var(--brand-weak); border:1px solid var(--brand-weak-line);
+    padding:2px 9px; border-radius:var(--radius-pill); font-weight:700; font-size:12px; }
+  .ang .preis { grid-column:2; grid-row:1; text-align:right; font-weight:800; font-size:17px;
+    color:var(--price); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .ang .grund { grid-column:2; grid-row:2; text-align:right; color:var(--muted); font-size:12px; white-space:nowrap; }
   .ang.unsicher { background:var(--warn-bg); }
-  .badge { display:inline-block; font-size:11px; background:var(--warn-bg); color:var(--warn); border:1px solid var(--warn-line); border-radius:5px; padding:0 7px; margin-left:7px; font-weight:600; }
-  .leer { padding:var(--s3) var(--s6); color:var(--muted); font-style:italic; font-size:14px; }
-  .quelle { font-family:var(--mono); font-size:11px; color:var(--faint); }
+  .ang.unsicher:hover { background:var(--warn-bg); filter:brightness(.99); }
+  .badge { display:inline-block; font-size:11px; background:var(--warn-bg); color:var(--warn);
+    border:1px solid var(--warn-line); border-radius:6px; padding:1px 8px; margin-left:8px; font-weight:700; }
+  .leer { padding:var(--s4) var(--s6); color:var(--muted); font-style:italic; font-size:14px; }
 
-  footer.note { margin-top:var(--s6); padding-top:var(--s4); border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+  /* Quelle: sichtbar lassen, nur schöner (kein Roh-String mehr) */
+  .quelle { display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:var(--muted);
+    background:var(--panel-3); border:1px solid var(--line); border-radius:6px; padding:1px 7px; font-weight:600; }
+
+  /* Kategorie-Chip / Korrektur-Anker — jetzt ein echter Button */
+  .gchip { display:inline-flex; align-items:center; font-size:11.5px; color:var(--muted);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:2px 9px; margin-left:8px;
+    cursor:pointer; vertical-align:middle; font-weight:600; min-height:0; }
+  .gchip:hover { border-color:var(--brand); color:var(--brand-text); background:var(--brand-weak); filter:none; transform:none; box-shadow:none; }
+  .gchip:focus-visible { box-shadow:var(--ring); }
+  .ang.unsicher .gchip { border-color:var(--warn-line); background:var(--warn-bg); color:var(--warn); }
+  .ksel { font-size:13px; padding:6px 8px; border:1.5px solid var(--brand); border-radius:8px; margin-left:8px;
+    vertical-align:middle; background:var(--panel); color:var(--ink); min-height:0; }
+
+  footer.note { margin-top:var(--s6); padding-top:var(--s4); border-top:1px solid var(--line);
+    color:var(--muted); font-size:13px; }
   footer.note .haendler { color:var(--ink-2); }
   footer.note .hinweis { display:block; margin-top:6px; font-style:italic; }
+  .sep { color:var(--muted); }
 
-  .sep { color:var(--faint); }
+  /* sr-only für reine Screenreader-Hinweise */
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
-  /* --- Ergebnis: sticky Header mit horizontalem Gruppen-Band --- */
-  header.ergebnis-header { position:sticky; top:0; z-index:5; background:var(--bg); padding-top:var(--s2); padding-bottom:var(--s3); margin-bottom:var(--s4); border-bottom:1px solid var(--line); }
-  header.ergebnis-header .summary { margin-bottom:var(--s3); }
-  header.ergebnis-header .filters { margin-bottom:var(--s3); }
-  nav.gruppenband { display:flex; gap:6px; overflow-x:auto; padding:2px 0; scrollbar-width:thin; }
-  .navitem {
-    flex:none; display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
-    padding:6px 12px; border-radius:999px; min-height:0; cursor:pointer;
-    background:var(--panel); color:var(--ink-2); border:1px solid var(--line);
-    font-weight:500; font-size:13px;
-    transition:background .15s, color .15s, border-color .15s;
+  @media (max-width:640px) {
+    .intro { padding-top:var(--s6); }
+    .wrap { padding-left:var(--s4); padding-right:var(--s4); }
+    .appbar-inner { padding:0 var(--s4); }
+    .appbar .brand span.word { display:none; }   /* nur Logo auf schmalem Schirm */
+    li.ang { padding-left:var(--s4); padding-right:var(--s4); }
+    .grp-h-btn { padding-left:var(--s4); padding-right:var(--s4); }
   }
-  .navitem:hover { background:var(--panel-2); transform:none; box-shadow:none; color:var(--ink); border-color:var(--faint); }
-  .navitem.aktiv { background:var(--brand-weak); color:var(--brand-d); border-color:#cfe3d9; font-weight:600; }
-  .navitem .nav-cnt { font-variant-numeric:tabular-nums; color:var(--muted); font-size:12px; }
-  .navitem.aktiv .nav-cnt { color:var(--brand-d); }
-  .navitem .nav-uns { font-size:10px; color:var(--warn); border:1px solid var(--warn-line); background:var(--warn-bg); border-radius:5px; padding:0 5px; font-weight:700; }
-  .kfeedback { font-size:13px; color:var(--brand-d); font-weight:600; height:0; overflow:hidden; transition:height .2s; }
-  .kfeedback.an { height:22px; margin-top:var(--s2); }
-
-  /* Kategorie-Chip pro Angebot (zugleich Korrektur-Anker) */
-  .ang .gchip { display:inline-block; font-size:11px; color:var(--muted); background:var(--panel-2); border:1px solid var(--line); border-radius:5px; padding:0 7px; margin-left:7px; cursor:pointer; vertical-align:middle; }
-  .ang .gchip:hover { border-color:var(--brand); color:var(--brand-d); }
-  .ang.unsicher .gchip { border-color:var(--warn-line); background:var(--warn-bg); color:var(--warn); }
-  .ang .ksel { font-size:12px; padding:2px 6px; border:1px solid var(--brand); border-radius:6px; margin-left:7px; vertical-align:middle; }
 </style>
 </head>
 <body>
-<header class="top">
-  <div class="top-inner">
-    <p class="eyebrow">Ortskonkret · händlerübergreifend · belegt</p>
-    <h1>Angebots-Übersicht</h1>
-    <p>Zwei strikt getrennte Stufen: zuerst die Rohdaten <b>deterministisch</b> holen
-       und speichern (kein LLM, kein Key), danach erst per LLM in Produktgruppen
-       einordnen. Jedes Angebot ist belegt — kein Auffüllen, Unsicheres ist markiert.</p>
+<a class="sr-only" href="#stage1">Zum Inhalt springen</a>
+
+<header class="appbar">
+  <div class="appbar-inner">
+    <a class="brand" href="#" aria-label="Angebots-Übersicht — Start">
+      <span class="logo" aria-hidden="true">🛒</span>
+      <span class="word">Angebote</span>
+    </a>
+    <span class="place leer" id="appbarPlz" aria-live="polite">PLZ …</span>
+    <span class="spacer"></span>
+    <button class="iconbtn" id="appbarSettings" type="button" title="LLM-Konfiguration" aria-label="LLM-Konfiguration öffnen">⚙</button>
   </div>
 </header>
+
+<div class="intro">
+  <p class="eyebrow">Ortskonkret · händlerübergreifend · belegt</p>
+  <h1>Angebots-Übersicht</h1>
+  <p>Zwei strikt getrennte Stufen: zuerst die Rohdaten <b>deterministisch</b> holen
+     und speichern (kein LLM, kein Key), danach erst per LLM in Produktgruppen
+     einordnen. Jedes Angebot ist belegt — kein Auffüllen, Unsicheres ist markiert.</p>
+</div>
 
 <div class="wrap">
   <div class="stages">
@@ -264,7 +363,7 @@
     <!-- ============ STUFE 1 ============ -->
     <section class="stage" id="stage1">
       <div class="stage-head">
-        <div class="stage-num">1</div>
+        <div class="stage-num" aria-hidden="true">1</div>
         <div class="stage-titles">
           <h2>Rohdaten holen &amp; speichern</h2>
           <p class="sub">Deterministischer Abruf für eine PLZ. Wird pro PLZ/Woche auf Platte gespeichert.</p>
@@ -275,23 +374,23 @@
         <div class="row">
           <div class="field">
             <label for="plz">PLZ</label>
-            <input id="plz" type="text" value="60487" inputmode="numeric" maxlength="5" />
+            <input id="plz" type="text" value="60487" inputmode="numeric" maxlength="5" autocomplete="postal-code" />
           </div>
           <div class="field">
-            <label>&nbsp;</label>
-            <button id="rohholen">Rohdaten holen ▶</button>
+            <label for="rohholen">&nbsp;</label>
+            <button id="rohholen" type="button">Rohdaten holen ▶</button>
           </div>
         </div>
-        <div id="rohstatus"></div>
+        <div id="rohstatus" role="status" aria-live="polite"></div>
         <div id="rohstand"></div>
       </div>
     </section>
 
-    <!-- ============ LLM-KONFIG (separat) ============ -->
+    <!-- ============ LLM-KONFIG ============ -->
     <details class="config" id="config">
       <summary>
-        <span class="chev">▸</span>
-        <span class="ico">⚙</span>
+        <span class="chev" aria-hidden="true">▸</span>
+        <span class="ico" aria-hidden="true">⚙</span>
         <span>LLM-Konfiguration</span>
         <span class="gewaehlt-chip" id="gewaehltChip" title="aktuell gewähltes Modell">—</span>
         <span class="gilt">gilt für Stufe&nbsp;2</span>
@@ -314,8 +413,8 @@
             <input id="modellsuche" type="text" placeholder="z. B. qwen" />
           </div>
           <div class="field">
-            <label>&nbsp;</label>
-            <button id="refresh" class="ghost icon" title="Modell-Liste aktualisieren">↻ aktualisieren</button>
+            <label for="refresh">&nbsp;</label>
+            <button id="refresh" class="ghost icon" type="button" title="Modell-Liste aktualisieren">↻ aktualisieren</button>
           </div>
         </div>
         <div class="row" style="margin-top:var(--s4)" id="keyzeile">
@@ -331,7 +430,7 @@
     <!-- ============ STUFE 2 ============ -->
     <section class="stage locked" id="stage2">
       <div class="stage-head">
-        <div class="stage-num">2</div>
+        <div class="stage-num" aria-hidden="true">2</div>
         <div class="stage-titles">
           <h2>Kategorisieren</h2>
           <p class="sub">Ordnet die gespeicherten Rohdaten per LLM in Produktgruppen. Verändert keine Angebotsdaten.</p>
@@ -341,12 +440,12 @@
       <div class="stage-body">
         <div class="row">
           <div class="field">
-            <label>&nbsp;</label>
-            <button id="kategorisieren" disabled>Kategorisieren ▶</button>
+            <label for="kategorisieren">&nbsp;</label>
+            <button id="kategorisieren" type="button" disabled>Kategorisieren ▶</button>
           </div>
         </div>
         <div class="hint lock" id="lockhint">🔒 Erst aktiv, sobald für die PLZ Rohdaten gespeichert sind (Stufe&nbsp;1).</div>
-        <div id="status"></div>
+        <div id="status" role="status" aria-live="polite"></div>
       </div>
     </section>
 
@@ -361,8 +460,8 @@
         <div class="field"><label for="ftext">Angebot suchen</label><input id="ftext" type="text" placeholder="Titel…" /></div>
         <div class="field check"><input id="fsicher" type="checkbox" /><label for="fsicher">nur sichere</label></div>
       </div>
-      <nav id="gruppennav" class="gruppenband" aria-label="Produktgruppen"></nav>
-      <div id="korrektur-feedback" class="kfeedback"></div>
+      <nav id="gruppennav" class="gruppenband" aria-label="Produktgruppen — zum Abschnitt springen"></nav>
+      <div id="korrektur-feedback" class="kfeedback" role="status" aria-live="polite"></div>
     </header>
     <div id="gruppen"></div>
     <footer class="note" id="footer"></footer>
@@ -375,8 +474,6 @@ let DATEN = null;        // kategorisiertes Ergebnis (Stufe 2)
 let ROHDA = false;       // ob für die aktuelle PLZ Rohdaten vorliegen
 
 // Pfad-Basis: lokal "/", hinter einem Reverse-Proxy z.B. "/angebote/".
-// Macht die API-Aufrufe pfad-agnostisch -- absolute /api/-Pfade würden unter
-// einem Unterpfad sonst ins Leere zeigen (404).
 const BASE = location.pathname.endsWith("/")
   ? location.pathname
   : location.pathname.replace(/[^/]*$/, "");
@@ -387,11 +484,17 @@ function preisFmt(p){ return p!=null ? p.toLocaleString("de-DE",{minimumFraction
 function setRohStatus(html){ $("#rohstatus").innerHTML = html; }
 function setStatus(html){ $("#status").innerHTML = html; }
 
+// App-Bar: aktuelle PLZ spiegeln (gibt App-Gefühl + Orientierung)
+function setAppbarPlz(){
+  const v = ($("#plz").value || "").trim();
+  const el = $("#appbarPlz");
+  if (/^\d{5}$/.test(v)){ el.textContent = "📍 " + v; el.classList.remove("leer"); }
+  else { el.textContent = "PLZ wählen"; el.classList.add("leer"); }
+}
+
 // ----- Modelle (LLM-Konfig: OpenRouter ODER Ollama) -------------------------
 function anbieter(){ return $("#anbieter").value; }
 
-// Auswahl in localStorage merken/laden, damit Anbieter + Modell einen Reload
-// überleben (statt auf den Default zurückzuspringen).
 function merkeWahl(){
   try {
     localStorage.setItem("ang_anbieter", anbieter());
@@ -402,8 +505,6 @@ function merkeWahl(){
 function gemerkterAnbieter(){ try { return localStorage.getItem("ang_anbieter"); } catch(e){ return null; } }
 function gemerktesModell(ab){ try { return localStorage.getItem("ang_modell_" + ab); } catch(e){ return null; } }
 
-// Hält das dauerhaft sichtbare "gewähltes Modell"-Chip im Konfig-Kopf aktuell --
-// auch wenn das Panel zugeklappt ist -- und merkt die Wahl.
 function setGewaehlt(){
   const sel = $("#modell");
   const opt = sel.options[sel.selectedIndex];
@@ -416,7 +517,6 @@ function setGewaehlt(){
 async function ladeModelle(q=""){
   const sel = $("#modell");
   const ab = anbieter();
-  // Anbieter-spezifische UI: Ollama braucht weder Key noch Suche.
   $("#keyzeile").style.display = ab === "ollama" ? "none" : "";
   $("#suchfeld").style.display = ab === "ollama" ? "none" : "";
   $("#konfighint").innerHTML = ab === "ollama"
@@ -449,8 +549,6 @@ async function ladeModelle(q=""){
       if (!m.tools) o.disabled = true;
       sel.appendChild(o);
     }
-    // Vorauswahl: gemerktes Modell -- aber bei OpenRouter NICHT automatisch ein
-    // gedrosseltes Free-Modell (führt zu 429); dann lieber das empfohlene.
     const opts = [...sel.options];
     const gemerkt = gemerktesModell(ab);
     const gemerktOpt = gemerkt ? opts.find(o => o.value === gemerkt && !o.disabled) : null;
@@ -520,7 +618,6 @@ async function pruefeRohstand(plz){
   if (!/^\d{5}$/.test(plz)) return;
   try {
     const r = await fetch(api("/api/rohdaten/" + encodeURIComponent(plz)));
-    // Stale-Guard: zwischenzeitlich getippte/andere PLZ -> Antwort verwerfen.
     if ($("#plz").value.trim() !== plz) return;
     if (r.status === 404) { lockStage2("Noch keine Rohdaten für diese PLZ — Stufe 1 ausführen."); return; }
     if (!r.ok) return;
@@ -554,12 +651,11 @@ async function holeRohdaten(){
 }
 
 // ----- Stufe 2: Kategorisieren ----------------------------------------------
-// Sichtbarer LLM-Arbeits-Indikator (Grundregel: zeig, dass das Modell arbeitet)
 function llmBusy(titel, done, total, modell){
   const indet = !total;
   const pct = indet ? 0 : Math.round(100 * done / total);
-  return `<div class="llm-busy ${indet ? "indet" : ""}">
-    <div class="spin" role="status" aria-label="Das LLM arbeitet"></div>
+  return `<div class="llm-busy ${indet ? "indet" : ""}" aria-busy="true">
+    <div class="spin" role="status" aria-label="Das Sprachmodell arbeitet"></div>
     <div class="txt">
       <span class="hl">🤖 ${esc(titel)}</span>${total ? ` · <b>Batch ${done}/${total}</b>` : ""}
       <small>${modell ? "Modell: " + esc(modell) : "das Sprachmodell ordnet die Angebote ein …"}</small>
@@ -632,7 +728,7 @@ function render(){
   fh.innerHTML = "<option value=''>alle</option>" + d.haendler.map(h => `<option>${esc(h)}</option>`).join("");
   fh.value = aktuell;
 
-  zeichneGruppen();  // baut Sektionen + füllt das Gruppen-Band mit den Counts
+  zeichneGruppen();
 
   $("#footer").innerHTML =
     `<span class="haendler"><b>Beobachtete Händler (belegt):</b> ${d.haendler.map(esc).join(", ")}.</span>` +
@@ -659,10 +755,25 @@ function zeichneGruppen(){
     const sec = document.createElement("section");
     sec.className = "grp";
     sec.dataset.grp = g.name;
+    const secId = "grp-" + g.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    sec.id = secId;
+
     const h = document.createElement("h3");
-    h.innerHTML = `<span>${esc(g.name)}</span><span class="cnt">${items.length}</span>`;
-    h.onclick = () => sec.classList.toggle("zu");
+    h.className = "grp-h";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "grp-h-btn";
+    btn.setAttribute("aria-expanded", "true");
+    btn.innerHTML =
+      `<span class="left"><span class="dot" aria-hidden="true"></span>${esc(g.name)}</span>` +
+      `<span class="cnt">${items.length}<span class="chev" aria-hidden="true">▾</span></span>`;
+    btn.onclick = () => {
+      const zu = sec.classList.toggle("zu");
+      btn.setAttribute("aria-expanded", zu ? "false" : "true");
+    };
+    h.appendChild(btn);
     sec.appendChild(h);
+
     if (!items.length){
       const p = document.createElement("div"); p.className = "leer";
       p.textContent = (fH || fT || nurSicher) ? "keine Treffer im Filter" : "keine Angebote";
@@ -684,6 +795,7 @@ function baueGruppenband(navDaten){
   if (!navDaten.length){ nav.innerHTML = `<span class="navitem" style="cursor:default;color:var(--muted)">keine Treffer</span>`; return; }
   for (const g of navDaten){
     const b = document.createElement("button");
+    b.type = "button";
     b.className = "navitem"; b.dataset.grp = g.name;
     const uns = g.uns ? ` <span class="nav-uns" title="${g.uns} unsicher">${g.uns}</span>` : "";
     b.innerHTML = `<span>${esc(g.name)}</span><span class="nav-cnt">${g.count}</span>${uns}`;
@@ -697,8 +809,17 @@ function springeZu(name){
   for (const sec of document.querySelectorAll("#gruppen section.grp")){
     if (sec.dataset.grp === name){ ziel = sec; break; }
   }
-  if (ziel){ ziel.classList.remove("zu"); ziel.scrollIntoView({behavior:"smooth", block:"start"}); }
-  for (const b of document.querySelectorAll(".navitem")) b.classList.toggle("aktiv", b.dataset.grp === name);
+  if (ziel){
+    ziel.classList.remove("zu");
+    const btn = ziel.querySelector(".grp-h-btn");
+    if (btn) btn.setAttribute("aria-expanded", "true");
+    ziel.scrollIntoView({behavior:"smooth", block:"start"});
+  }
+  for (const b of document.querySelectorAll(".navitem")){
+    const aktiv = b.dataset.grp === name;
+    b.classList.toggle("aktiv", aktiv);
+    if (aktiv) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current");
+  }
 }
 
 function zeile(a, gruppe){
@@ -709,11 +830,15 @@ function zeile(a, gruppe){
   const gueltig = (a.gueltig_von || a.gueltig_bis)
     ? ` <span class="sep">·</span> gültig ${a.gueltig_von||"?"}–${a.gueltig_bis||"?"}` : "";
   const badge = a.unsicher ? `<span class="badge">unsicher</span>` : "";
+  // Quelle: sichtbar lassen, aber als ruhiges Badge mit Quellen-Namen (statt Roh-URL)
+  const qName = (a.quelle||"").split(/[:/?#]/)[0] || "Quelle";
+  const quelleBadge = a.quelle
+    ? `<span class="quelle" title="${esc(a.quelle)}">🔗 ${esc(qName)}</span>` : "";
   li.innerHTML =
-    `<div class="name">${marke}${esc(a.titel)}${badge}<span class="gchip" title="Produktgruppe ändern">${esc(gruppe)}</span></div>` +
+    `<div class="name">${marke}${esc(a.titel)}${badge}` +
+      `<button type="button" class="gchip" title="Produktgruppe ändern" aria-label="Produktgruppe von „${esc(a.titel)}“ ändern (aktuell ${esc(gruppe)})">${esc(gruppe)}</button></div>` +
     `<div class="preis">${preisFmt(a.preis)}</div>` +
-    `<div class="meta"><span class="haendler">${esc(a.haendler)}</span>${menge}${gueltig}
-       &nbsp;<span class="quelle" title="${esc(a.quelle)}">${esc((a.quelle||"").slice(0,42))}</span></div>` +
+    `<div class="meta"><span class="haendler">${esc(a.haendler)}</span>${menge}${gueltig} ${quelleBadge}</div>` +
     `<div class="grund">${a.grundpreis ? esc(a.grundpreis) : ""}</div>`;
   const chip = li.querySelector(".gchip");
   chip.onclick = () => oeffneKorrektur(chip, a, gruppe);
@@ -724,6 +849,7 @@ function zeile(a, gruppe){
 function oeffneKorrektur(chip, a, vonGruppe){
   const sel = document.createElement("select");
   sel.className = "ksel";
+  sel.setAttribute("aria-label", "Neue Produktgruppe wählen");
   for (const g of DATEN.gruppen.map(x => x.name)){
     const o = document.createElement("option");
     o.value = g; o.textContent = g;
@@ -762,7 +888,7 @@ async function korrigiere(a, vonGruppe, zielGruppe){
 function zeigeFeedback(txt, fehler){
   const el = $("#korrektur-feedback");
   el.textContent = txt;
-  el.style.color = fehler ? "var(--err)" : "var(--brand-d)";
+  el.style.color = fehler ? "var(--err)" : "var(--brand-text)";
   el.classList.add("an");
   clearTimeout(zeigeFeedback._t);
   zeigeFeedback._t = setTimeout(() => el.classList.remove("an"), 2800);
@@ -773,11 +899,17 @@ $("#rohholen").onclick = holeRohdaten;
 $("#kategorisieren").onclick = kategorisiere;
 $("#refresh").onclick = () => ladeModelle($("#modellsuche").value.trim());
 $("#modellsuche").addEventListener("keydown", e => { if (e.key==="Enter") ladeModelle(e.target.value.trim()); });
-$("#anbieter").addEventListener("change", () => ladeModelle());   // Anbieter umschalten -> Liste neu
-$("#modell").addEventListener("change", setGewaehlt);             // Auswahl -> sichtbares Chip aktualisieren
+$("#anbieter").addEventListener("change", () => ladeModelle());
+$("#modell").addEventListener("change", setGewaehlt);
 $("#plz").addEventListener("keydown", e => { if (e.key==="Enter") holeRohdaten(); });
+$("#appbarSettings").onclick = () => {
+  const c = $("#config"); c.open = true;
+  c.scrollIntoView({behavior:"smooth", block:"center"});
+  c.querySelector("summary").focus();
+};
 let _plzTimer;
 $("#plz").addEventListener("input", () => {
+  setAppbarPlz();
   clearTimeout(_plzTimer);
   const plz = $("#plz").value.trim();
   _plzTimer = setTimeout(() => pruefeRohstand(plz), 350);
@@ -786,25 +918,24 @@ for (const id of ["#fhaendler","#ftext","#fsicher"])
   $(id).addEventListener("input", () => DATEN && zeichneGruppen());
 
 // ----- Init ------------------------------------------------------------------
-// Bookmarkbar: ?plz=… [&anbieter=…] [&modell=…] [&auto=1]
 (async function init(){
   const _p = new URLSearchParams(location.search);
-  // Anbieter: URL-Param hat Vorrang, sonst die gemerkte Wahl, sonst Default.
   const ab = _p.get("anbieter") || gemerkterAnbieter();
   if (ab) $("#anbieter").value = ab;
   await ladeModelle();
   const m = _p.get("modell");
   if (m){
     const sel = $("#modell");
-    if (![...sel.options].some(o => o.value === m)){   // auch nicht-gelistetes zulassen
+    if (![...sel.options].some(o => o.value === m)){
       const o = document.createElement("option"); o.value = o.textContent = m;
       sel.insertBefore(o, sel.firstChild);
     }
     sel.value = m; setGewaehlt();
   }
   if (_p.get("plz")) $("#plz").value = _p.get("plz").trim();
+  setAppbarPlz();
   await pruefeRohstand($("#plz").value.trim());
-  if (_p.get("auto") && ROHDA) kategorisiere();   // Stufe 2 automatisch (wenn Rohdaten da)
+  if (_p.get("auto") && ROHDA) kategorisiere();
 })();
 </script>
 </body>

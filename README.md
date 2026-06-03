@@ -81,13 +81,21 @@ indem man sie ihre eigene Arbeit zwischenspeichern lässt.**
 
 ## So sieht es aus
 
-Zweistufige UI -- Rohdaten holen (deterministisch), dann kategorisieren (LLM):
+Zweistufige UI -- Rohdaten holen (deterministisch), dann kategorisieren (LLM).
+Heller Modus (Start-Screen):
 
-![Zweistufige UI: Rohdaten holen, OpenRouter-Konfig, Kategorisieren](docs/ui-stufen.png)
+![Zweistufige UI: Rohdaten holen, LLM-Konfig, Kategorisieren](docs/ui-stufen.png)
 
-Die nach Produktgruppen gruppierte Ergebnisansicht nach Stufe 2:
+Die nach Produktgruppen gruppierte Ergebnisansicht nach Stufe 2 -- hier im
+Dunkelmodus (die UI folgt automatisch dem System-Theme):
 
-![Gruppierte Übersicht mit Preisen, Händlern, unsicher-Markierung](docs/ui-ergebnis.png)
+![Gruppierte Übersicht mit Preisen, Händlern, Kategorie-Chips, Quelle-Beleg](docs/ui-ergebnis.png)
+
+**Barrierefrei & adaptiv.** Hell/Dunkel adaptiv (`prefers-color-scheme`),
+volle Tastaturbedienung mit sichtbarem Fokus, `aria-live` für den
+LLM-Fortschritt. Die Farbpaletten beider Themes sind auf **WCAG-AAA-Kontrast
+(≥7:1)** ausgelegt -- automatisiert mit `axe-core` geprüft: 0 Verletzungen,
+inklusive der verschärften AAA-Regel `color-contrast-enhanced`.
 
 ---
 

@@ -12,3 +12,7 @@ __pycache__/
 # Original-Input-Archive (Specs liegen kanonisch in .claude/skills/)
 /files.zip
 /temp/
+
+# gespeicherte Rohdaten (Stufe 1, pro PLZ/Woche generiert)
+/src/data/
+/data/

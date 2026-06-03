@@ -6,113 +6,297 @@
 <title>Angebots-Übersicht</title>
 <style>
   :root {
-    --bg:#f6f5f2; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6864;
-    --line:#e2ded7; --accent:#1f6f53; --accent-weak:#e7f1ec;
-    --warn:#9a6a00; --warn-bg:#fdf3df; --price:#11221b;
-    --radius:10px; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    /* warme Neutral-Skala (kein reines Grau) */
+    --bg:#f4f2ee; --panel:#ffffff; --panel-2:#faf9f6;
+    --ink:#1b1a17; --ink-2:#3c3a35; --muted:#76726b; --faint:#a39e95;
+    --line:#e5e0d8; --line-2:#efebe3;
+    --brand:#1f6f53; --brand-d:#185b44; --brand-weak:#e7f1ec;
+    --accent:#9a6a00; --warn:#9a6a00; --warn-bg:#fbf2dd; --warn-line:#ecd49a;
+    --err:#9c2a23; --err-bg:#fbeeec; --err-line:#e6b8b2;
+    --price:#11221b;
+    /* Spacing-Skala 4/8/12/16/24/32/48 */
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px; --s8:32px; --s12:48px;
+    --radius:14px; --radius-sm:9px;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --shadow-sm:0 1px 2px rgba(30,26,20,.05);
+    --shadow-md:0 6px 18px -6px rgba(30,26,20,.12);
   }
   * { box-sizing:border-box; }
   body {
     margin:0; background:var(--bg); color:var(--ink);
-    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; letter-spacing:-.003em;
   }
+  @media (prefers-reduced-motion: reduce) { * { transition-duration:.01ms !important; } }
+
   header.top {
-    padding:22px 26px 16px; border-bottom:1px solid var(--line); background:var(--panel);
+    padding:var(--s8) var(--s6) var(--s6); border-bottom:1px solid var(--line);
+    background:var(--panel);
   }
-  header.top h1 { margin:0; font-size:20px; letter-spacing:-.01em; }
-  header.top p { margin:4px 0 0; color:var(--muted); font-size:13px; max-width:60ch; }
-  .wrap { max-width:1040px; margin:0 auto; padding:20px 26px 80px; }
+  .top-inner { max-width:1180px; margin:0 auto; }
+  header.top .eyebrow {
+    font-size:12px; text-transform:uppercase; letter-spacing:.16em;
+    color:var(--brand); font-weight:700; margin:0 0 var(--s2);
+  }
+  header.top h1 {
+    margin:0; font-size:clamp(1.7rem,2.6vw,2.3rem); line-height:1.08;
+    letter-spacing:-.025em; font-weight:700;
+  }
+  header.top p { margin:var(--s3) 0 0; color:var(--muted); font-size:15px; max-width:68ch; text-wrap:pretty; }
 
-  .controls {
-    display:flex; flex-wrap:wrap; gap:10px 14px; align-items:end;
+  .wrap { max-width:1180px; margin:0 auto; padding:var(--s8) var(--s6) var(--s12); }
+
+  /* Stufen-Anordnung */
+  .stages { display:grid; grid-template-columns:1fr; gap:var(--s6); }
+
+  .stage {
     background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
-    padding:16px; margin-bottom:18px;
+    box-shadow:var(--shadow-sm); overflow:hidden;
   }
-  .field { display:flex; flex-direction:column; gap:4px; }
-  .field label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .stage.locked { opacity:.72; }
+  .stage-head {
+    display:flex; align-items:center; gap:var(--s4);
+    padding:var(--s4) var(--s6); border-bottom:1px solid var(--line-2);
+    background:linear-gradient(var(--panel),var(--panel-2));
+  }
+  .stage-num {
+    flex:none; width:30px; height:30px; border-radius:50%;
+    display:grid; place-items:center; font-weight:700; font-size:14px;
+    background:var(--brand); color:#fff; font-variant-numeric:tabular-nums;
+  }
+  .stage.locked .stage-num { background:var(--faint); }
+  .stage-titles { flex:1; min-width:0; }
+  .stage-titles h2 { margin:0; font-size:16px; font-weight:700; letter-spacing:-.01em; }
+  .stage-titles .sub { margin:2px 0 0; font-size:13px; color:var(--muted); }
+  .stage-flag {
+    flex:none; font-size:11px; font-weight:600; letter-spacing:.04em;
+    text-transform:uppercase; padding:3px 9px; border-radius:999px;
+    background:var(--brand-weak); color:var(--brand-d); border:1px solid #cfe3d9;
+  }
+  .stage-flag.llm { background:#f0ecf7; color:#5a4a87; border-color:#ddd3ee; }
+  .stage-body { padding:var(--s6); }
+
+  .row { display:flex; flex-wrap:wrap; gap:var(--s4) var(--s6); align-items:end; }
+  .field { display:flex; flex-direction:column; gap:var(--s1); }
+  .field label { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); font-weight:600; }
   input, select, button { font:inherit; }
-  input[type=text], select {
-    padding:8px 10px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink);
+  input[type=text], input[type=password], select {
+    padding:10px 12px; border:1px solid var(--line); border-radius:var(--radius-sm);
+    background:#fff; color:var(--ink); transition:border-color .15s, box-shadow .15s;
   }
-  input#plz { width:90px; font-variant-numeric:tabular-nums; }
-  select#modell { min-width:230px; }
-  input#modellsuche { width:130px; }
-  .check { flex-direction:row; align-items:center; gap:7px; }
-  .check label { text-transform:none; letter-spacing:0; font-size:13px; color:var(--ink); }
+  input:focus, select:focus { outline:none; border-color:var(--brand); box-shadow:0 0 0 3px var(--brand-weak); }
+  input#plz { width:118px; font-variant-numeric:tabular-nums; font-size:18px; font-weight:600; letter-spacing:.04em; }
+  select#modell { min-width:280px; }
+  input#modellsuche { width:150px; }
+
   button {
-    padding:9px 16px; border:1px solid var(--accent); border-radius:7px;
-    background:var(--accent); color:#fff; cursor:pointer; font-weight:600;
+    padding:11px 20px; border:1px solid var(--brand); border-radius:var(--radius-sm);
+    background:var(--brand); color:#fff; cursor:pointer; font-weight:600; min-height:44px;
+    transition:transform .15s ease, background .15s, box-shadow .15s; white-space:nowrap;
   }
-  button.ghost { background:#fff; color:var(--accent); }
-  button:disabled { opacity:.5; cursor:default; }
-  button.icon { padding:8px 11px; }
+  button:hover:not(:disabled) { background:var(--brand-d); transform:translateY(-1px); box-shadow:var(--shadow-md); }
+  button.ghost { background:#fff; color:var(--brand); }
+  button.ghost:hover:not(:disabled) { background:var(--brand-weak); color:var(--brand-d); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button.icon { padding:10px 13px; }
 
-  .keyrow { width:100%; display:none; gap:8px; align-items:center; margin-top:4px; }
-  .keyrow.show { display:flex; }
-  .keyrow input { flex:1; }
-  .keytoggle { background:none; border:none; color:var(--muted); cursor:pointer; font-size:12px; text-decoration:underline; padding:0; }
+  .hint { font-size:12.5px; color:var(--muted); margin-top:var(--s3); }
+  .hint.lock { color:var(--accent); display:flex; align-items:center; gap:6px; }
 
-  #status { margin:14px 0; min-height:22px; font-size:14px; }
-  .bar { height:8px; background:var(--line); border-radius:5px; overflow:hidden; margin-top:8px; }
-  .bar > i { display:block; height:100%; width:0; background:var(--accent); transition:width .25s; }
-  .err { background:var(--warn-bg); border:1px solid #eccf8a; color:#5a3d00; padding:12px 14px; border-radius:8px; white-space:pre-wrap; font-family:var(--mono); font-size:13px; }
+  /* Roh-Stand-Anzeige */
+  .rohstand {
+    margin-top:var(--s4); padding:var(--s4); border:1px solid var(--line-2);
+    border-radius:var(--radius-sm); background:var(--panel-2);
+  }
+  .rohstand.ok { border-color:#cfe3d9; background:#f3f8f5; }
+  .rohstand .line1 { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:baseline; }
+  .rohstand .ok-dot { color:var(--brand); font-weight:700; }
+  .rohstand b { color:var(--ink); }
+  .rohstand .meta { color:var(--muted); font-size:13px; }
+  .rohstand .haendler-tags { margin-top:var(--s3); display:flex; flex-wrap:wrap; gap:6px; }
+  .tag { font-size:12px; background:var(--brand-weak); color:var(--brand-d); padding:2px 9px; border-radius:999px; border:1px solid #d7e7df; }
 
-  .summary { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; color:var(--muted); font-size:13px; margin:6px 0 14px; }
+  details.rohliste { margin-top:var(--s3); }
+  details.rohliste > summary { cursor:pointer; font-size:13px; color:var(--brand-d); font-weight:600; user-select:none; padding:var(--s2) 0; }
+  .rohtable { width:100%; border-collapse:collapse; margin-top:var(--s2); font-size:13.5px; }
+  .rohtable th { text-align:left; font-weight:600; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:6px 10px; border-bottom:1px solid var(--line); }
+  .rohtable td { padding:7px 10px; border-bottom:1px solid var(--line-2); vertical-align:top; }
+  .rohtable tr:last-child td { border-bottom:none; }
+  .rohtable .t-preis { text-align:right; font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  .rohtable .t-h { color:var(--muted); }
+  .rohtable .marke { color:var(--brand-d); font-weight:600; }
+
+  /* OpenRouter-Konfig (separater Bereich) */
+  .config {
+    border:1px dashed var(--line); border-radius:var(--radius); background:var(--panel-2);
+    margin:var(--s6) 0; overflow:hidden;
+  }
+  .config > summary {
+    cursor:pointer; user-select:none; list-style:none;
+    display:flex; align-items:center; gap:var(--s3);
+    padding:var(--s4) var(--s6); font-weight:700; font-size:15px;
+  }
+  .config > summary::-webkit-details-marker { display:none; }
+  .config > summary .chev { transition:transform .2s; color:var(--muted); }
+  .config[open] > summary .chev { transform:rotate(90deg); }
+  .config > summary .ico { font-size:14px; }
+  .config > summary .gilt { margin-left:auto; font-weight:500; font-size:12px; color:var(--muted); }
+  .config-body { padding:0 var(--s6) var(--s6); border-top:1px solid var(--line-2); padding-top:var(--s4); }
+  .keyrow { width:100%; max-width:560px; }
+  .keyrow input { width:100%; }
+
+  /* Status / Fortschritt */
+  #status { margin:var(--s4) 0 0; min-height:0; font-size:14.5px; }
+  #status:empty { margin:0; }
+  .bar { height:8px; background:var(--line); border-radius:5px; overflow:hidden; margin-top:var(--s2); max-width:420px; }
+  .bar > i { display:block; height:100%; width:0; background:var(--brand); transition:width .25s; }
+  .err {
+    background:var(--err-bg); border:1px solid var(--err-line); color:#6e201b;
+    padding:var(--s4); border-radius:var(--radius-sm); white-space:pre-wrap;
+    font-family:var(--mono); font-size:13px; line-height:1.5;
+  }
+  .pending { color:var(--muted); }
+
+  /* Ergebnis (Stufe 2) */
+  #result { margin-top:var(--s8); }
+  .summary { display:flex; flex-wrap:wrap; gap:var(--s2) var(--s6); align-items:baseline; color:var(--muted); font-size:14px; margin-bottom:var(--s4); }
   .summary b { color:var(--ink); }
-  .filters { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:end; margin-bottom:18px; }
-
-  section.grp { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:12px; overflow:hidden; }
-  section.grp > h2 {
-    margin:0; padding:11px 16px; font-size:14px; display:flex; justify-content:space-between;
-    align-items:center; cursor:pointer; background:linear-gradient(#fff,#fbfaf7); border-bottom:1px solid var(--line);
+  .filters {
+    display:flex; flex-wrap:wrap; gap:var(--s4) var(--s6); align-items:end;
+    padding:var(--s4) var(--s6); background:var(--panel); border:1px solid var(--line);
+    border-radius:var(--radius); margin-bottom:var(--s6);
   }
-  section.grp > h2 .cnt { color:var(--muted); font-weight:500; font-variant-numeric:tabular-nums; }
+  .check { flex-direction:row; align-items:center; gap:8px; }
+  .check label { text-transform:none; letter-spacing:0; font-size:14px; color:var(--ink); font-weight:400; }
+
+  section.grp { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:var(--s3); overflow:hidden; box-shadow:var(--shadow-sm); }
+  section.grp > h3 {
+    margin:0; padding:var(--s3) var(--s6); font-size:15px; font-weight:700; display:flex; justify-content:space-between;
+    align-items:center; cursor:pointer; background:linear-gradient(var(--panel),var(--panel-2)); border-bottom:1px solid var(--line-2);
+    letter-spacing:-.01em;
+  }
+  section.grp > h3 .cnt { color:var(--muted); font-weight:600; font-variant-numeric:tabular-nums; font-size:13px; }
   section.grp.zu ul { display:none; }
-  section.grp ul { list-style:none; margin:0; padding:4px 0; }
-  li.ang { display:grid; grid-template-columns:1fr auto; gap:2px 14px; padding:9px 16px; border-bottom:1px solid #f1edea; align-items:baseline; }
+  section.grp.zu > h3 { border-bottom:none; }
+  section.grp ul { list-style:none; margin:0; padding:var(--s1) 0; }
+  li.ang { display:grid; grid-template-columns:1fr auto; gap:2px var(--s4); padding:11px var(--s6); border-bottom:1px solid var(--line-2); align-items:baseline; }
   li.ang:last-child { border-bottom:none; }
   .ang .name { font-weight:600; }
-  .ang .name .marke { color:var(--accent); }
-  .ang .meta { grid-column:1; color:var(--muted); font-size:12.5px; }
-  .ang .meta .haendler { color:var(--ink); background:var(--accent-weak); padding:1px 6px; border-radius:5px; }
+  .ang .name .marke { color:var(--brand-d); }
+  .ang .meta { grid-column:1; color:var(--muted); font-size:13px; }
+  .ang .meta .haendler { color:var(--ink-2); background:var(--brand-weak); padding:1px 7px; border-radius:5px; font-weight:500; }
   .ang .preis { grid-column:2; grid-row:1; text-align:right; font-weight:700; color:var(--price); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .ang .grund { grid-column:2; grid-row:2; text-align:right; color:var(--muted); font-size:12px; white-space:nowrap; }
   .ang.unsicher { background:var(--warn-bg); }
-  .badge { display:inline-block; font-size:11px; background:var(--warn-bg); color:var(--warn); border:1px solid #eccf8a; border-radius:5px; padding:0 6px; margin-left:6px; }
-  .leer { padding:12px 16px; color:var(--muted); font-style:italic; }
-  .quelle { font-family:var(--mono); font-size:11px; color:#9a968f; }
+  .badge { display:inline-block; font-size:11px; background:var(--warn-bg); color:var(--warn); border:1px solid var(--warn-line); border-radius:5px; padding:0 7px; margin-left:7px; font-weight:600; }
+  .leer { padding:var(--s3) var(--s6); color:var(--muted); font-style:italic; font-size:14px; }
+  .quelle { font-family:var(--mono); font-size:11px; color:var(--faint); }
 
-  footer.note { margin-top:22px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; }
-  footer.note .haendler { color:var(--ink); }
+  footer.note { margin-top:var(--s6); padding-top:var(--s4); border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+  footer.note .haendler { color:var(--ink-2); }
   footer.note .hinweis { display:block; margin-top:6px; font-style:italic; }
+
+  .sep { color:var(--faint); }
 </style>
 </head>
 <body>
 <header class="top">
-  <h1>Angebots-Übersicht</h1>
-  <p>Ortskonkret, händlerübergreifend, nach Produktgruppen. Daten deterministisch aus marktguru,
-     Einordnung per LLM. Jedes Angebot ist belegt — kein Auffüllen, Unsicheres ist markiert.</p>
+  <div class="top-inner">
+    <p class="eyebrow">Ortskonkret · händlerübergreifend · belegt</p>
+    <h1>Angebots-Übersicht</h1>
+    <p>Zwei strikt getrennte Stufen: zuerst die Rohdaten <b>deterministisch</b> holen
+       und speichern (kein LLM, kein Key), danach erst per LLM in Produktgruppen
+       einordnen. Jedes Angebot ist belegt — kein Auffüllen, Unsicheres ist markiert.</p>
+  </div>
 </header>
 
 <div class="wrap">
-  <div class="controls">
-    <div class="field"><label for="plz">PLZ</label><input id="plz" type="text" value="60487" inputmode="numeric" /></div>
-    <div class="field">
-      <label for="modell">Modell</label>
-      <select id="modell"><option>lädt…</option></select>
-    </div>
-    <div class="field"><label for="modellsuche">Modell suchen</label><input id="modellsuche" type="text" placeholder="z.B. qwen" /></div>
-    <div class="field"><label>&nbsp;</label><button id="refresh" class="ghost icon" title="Modell-Liste aktualisieren">↻</button></div>
-    <div class="field check"><input id="nollm" type="checkbox" /><label for="nollm">ohne LLM (Rohliste)</label></div>
-    <div class="field"><label>&nbsp;</label><button id="holen">Holen ▶</button></div>
-    <button type="button" class="keytoggle" id="keytoggle">API-Key setzen (optional)</button>
-    <div class="keyrow" id="keyrow">
-      <input id="key" type="password" placeholder="OPENROUTER_API_KEY (bleibt lokal, nur an deinen Server)" />
-    </div>
+  <div class="stages">
+
+    <!-- ============ STUFE 1 ============ -->
+    <section class="stage" id="stage1">
+      <div class="stage-head">
+        <div class="stage-num">1</div>
+        <div class="stage-titles">
+          <h2>Rohdaten holen &amp; speichern</h2>
+          <p class="sub">Deterministischer Abruf für eine PLZ. Wird pro PLZ/Woche auf Platte gespeichert.</p>
+        </div>
+        <div class="stage-flag">deterministisch · kein LLM</div>
+      </div>
+      <div class="stage-body">
+        <div class="row">
+          <div class="field">
+            <label for="plz">PLZ</label>
+            <input id="plz" type="text" value="60487" inputmode="numeric" maxlength="5" />
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button id="rohholen">Rohdaten holen ▶</button>
+          </div>
+        </div>
+        <div id="rohstatus"></div>
+        <div id="rohstand"></div>
+      </div>
+    </section>
+
+    <!-- ============ OPENROUTER-KONFIG (separat) ============ -->
+    <details class="config" id="config">
+      <summary>
+        <span class="chev">▸</span>
+        <span class="ico">⚙</span>
+        <span>OpenRouter-Konfiguration</span>
+        <span class="gilt">gilt für Stufe&nbsp;2</span>
+      </summary>
+      <div class="config-body">
+        <div class="row">
+          <div class="field">
+            <label for="modell">Modell</label>
+            <select id="modell"><option>lädt…</option></select>
+          </div>
+          <div class="field">
+            <label for="modellsuche">Modell suchen</label>
+            <input id="modellsuche" type="text" placeholder="z. B. qwen" />
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button id="refresh" class="ghost icon" title="Modell-Liste aktualisieren">↻ aktualisieren</button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:var(--s4)">
+          <div class="field keyrow">
+            <label for="key">API-Key (bleibt lokal, nur an deinen Server)</label>
+            <input id="key" type="password" placeholder="OPENROUTER_API_KEY — optional, falls nicht in der Server-Umgebung" autocomplete="off" />
+          </div>
+        </div>
+        <p class="hint">Der Key wird ausschließlich für Stufe&nbsp;2 verwendet und nie in Stufe&nbsp;1 (Datenabruf) eingesetzt.</p>
+      </div>
+    </details>
+
+    <!-- ============ STUFE 2 ============ -->
+    <section class="stage locked" id="stage2">
+      <div class="stage-head">
+        <div class="stage-num">2</div>
+        <div class="stage-titles">
+          <h2>Kategorisieren</h2>
+          <p class="sub">Ordnet die gespeicherten Rohdaten per LLM in Produktgruppen. Verändert keine Angebotsdaten.</p>
+        </div>
+        <div class="stage-flag llm">LLM-Schritt</div>
+      </div>
+      <div class="stage-body">
+        <div class="row">
+          <div class="field">
+            <label>&nbsp;</label>
+            <button id="kategorisieren" disabled>Kategorisieren ▶</button>
+          </div>
+        </div>
+        <div class="hint lock" id="lockhint">🔒 Erst aktiv, sobald für die PLZ Rohdaten gespeichert sind (Stufe&nbsp;1).</div>
+        <div id="status"></div>
+      </div>
+    </section>
+
   </div>
 
-  <div id="status"></div>
-
+  <!-- ============ ERGEBNIS ============ -->
   <div id="result" hidden>
     <div class="summary" id="summary"></div>
     <div class="filters">
@@ -127,17 +311,24 @@
 
 <script>
 const $ = s => document.querySelector(s);
-let DATEN = null;
+let DATEN = null;        // kategorisiertes Ergebnis (Stufe 2)
+let ROHDA = false;       // ob für die aktuelle PLZ Rohdaten vorliegen
 
-async function ladeModelle(q="") {
+function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function preisFmt(p){ return p!=null ? p.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2})+" €" : "Preis fehlt"; }
+function setRohStatus(html){ $("#rohstatus").innerHTML = html; }
+function setStatus(html){ $("#status").innerHTML = html; }
+
+// ----- Modelle (OpenRouter-Konfig) ------------------------------------------
+async function ladeModelle(q=""){
   const sel = $("#modell");
   try {
     const r = await fetch("/api/modelle?q=" + encodeURIComponent(q));
     if (!r.ok) throw new Error((await r.json()).detail || r.status);
     const liste = await r.json();
     sel.innerHTML = "";
-    if (!liste.length) { sel.innerHTML = "<option value=''>(keine Treffer)</option>"; return; }
-    for (const m of liste) {
+    if (!liste.length){ sel.innerHTML = "<option value=''>(keine Treffer)</option>"; return; }
+    for (const m of liste){
       const o = document.createElement("option");
       o.value = m.id;
       const tag = m.frei ? "FREE" : "paid";
@@ -146,71 +337,153 @@ async function ladeModelle(q="") {
       if (!m.tools) o.disabled = true;
       sel.appendChild(o);
     }
-  } catch (e) {
+  } catch (e){
     sel.innerHTML = `<option value=''>Modelle nicht abrufbar</option>`;
-    setStatus(`<div class="err">Modelle nicht abrufbar: ${e.message}</div>`);
   }
 }
 
-function setStatus(html) { $("#status").innerHTML = html; }
+// ----- Stufe 1: Rohdaten holen / prüfen -------------------------------------
+function lockStage2(grund){
+  ROHDA = false;
+  $("#kategorisieren").disabled = true;
+  $("#stage2").classList.add("locked");
+  $("#lockhint").style.display = "flex";
+  if (grund) $("#lockhint").innerHTML = "🔒 " + grund;
+}
+function unlockStage2(){
+  ROHDA = true;
+  $("#kategorisieren").disabled = false;
+  $("#stage2").classList.remove("locked");
+  $("#lockhint").style.display = "none";
+}
 
-async function starteLauf() {
+function zeigeRohstand(d, frisch){
+  const dt = d.abgerufen_am ? new Date(d.abgerufen_am).toLocaleString("de-DE") : "—";
+  const tags = (d.haendler||[]).map(h => `<span class="tag">${esc(h)}</span>`).join("");
+  const zeilen = (d.angebote||[]).map(a => `
+    <tr>
+      <td>${a.marke ? `<span class="marke">${esc(a.marke)}</span> ` : ""}${esc(a.titel)}${a.menge?` <span class="t-h">· ${esc(a.menge)}</span>`:""}</td>
+      <td class="t-h">${esc(a.haendler)}</td>
+      <td class="t-preis">${preisFmt(a.preis)}</td>
+    </tr>`).join("");
+  $("#rohstand").innerHTML = `
+    <div class="rohstand ok">
+      <div class="line1">
+        <span class="ok-dot">✓ Rohdaten vorhanden</span>
+        <span>für PLZ <b>${esc(d.plz)}</b>${d.ort_name?` (${esc(d.ort_name)})`:""}</span>
+        <span class="meta">— <b>${d.anzahl}</b> Angebote · <b>${(d.haendler||[]).length}</b> Händler · geholt am ${esc(dt)}${frisch?" (gerade aktualisiert)":""}</span>
+      </div>
+      <div class="haendler-tags">${tags}</div>
+      ${(d.angebote||[]).length ? `
+      <details class="rohliste">
+        <summary>Belegte Rohliste anzeigen (${d.angebote.length}) — ungruppiert</summary>
+        <table class="rohtable">
+          <thead><tr><th>Artikel</th><th>Händler</th><th style="text-align:right">Preis</th></tr></thead>
+          <tbody>${zeilen}</tbody>
+        </table>
+      </details>` : `<div class="hint">Quellen liefen, lieferten aber 0 Angebote — kein Auffüllen.</div>`}
+    </div>`;
+  unlockStage2();
+}
+
+async function pruefeRohstand(plz){
+  $("#rohstand").innerHTML = "";
+  lockStage2();
+  if (!/^\d{5}$/.test(plz)) return;
+  try {
+    const r = await fetch("/api/rohdaten/" + encodeURIComponent(plz));
+    // Stale-Guard: zwischenzeitlich getippte/andere PLZ -> Antwort verwerfen.
+    if ($("#plz").value.trim() !== plz) return;
+    if (r.status === 404) { lockStage2("Noch keine Rohdaten für diese PLZ — Stufe 1 ausführen."); return; }
+    if (!r.ok) return;
+    const d = await r.json();
+    if ($("#plz").value.trim() !== plz) return;
+    zeigeRohstand(d, false);
+  } catch {}
+}
+
+async function holeRohdaten(){
   const plz = $("#plz").value.trim();
-  if (!plz) { setStatus(`<div class="err">Bitte eine PLZ eingeben.</div>`); return; }
-  $("#holen").disabled = true;
+  if (!/^\d{5}$/.test(plz)) { setRohStatus(`<div class="err">Bitte eine 5-stellige PLZ eingeben.</div>`); return; }
+  $("#rohholen").disabled = true;
+  $("#result").hidden = true; DATEN = null;
+  setRohStatus(`<div class="pending">Hole Angebote für <b>${esc(plz)}</b> … (deterministisch, ohne LLM)</div>`);
+  try {
+    const r = await fetch("/api/rohdaten", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({ plz })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    setRohStatus("");
+    zeigeRohstand(d, true);
+  } catch (e){
+    setRohStatus(`<div class="err">${esc(e.message)}</div>`);
+    lockStage2();
+  } finally {
+    $("#rohholen").disabled = false;
+  }
+}
+
+// ----- Stufe 2: Kategorisieren ----------------------------------------------
+async function kategorisiere(){
+  if (!ROHDA) return;
+  const plz = $("#plz").value.trim();
+  $("#kategorisieren").disabled = true;
   $("#result").hidden = true;
-  const noLlm = $("#nollm").checked;
-  setStatus(`<div>Hole Angebote für <b>${plz}</b> …</div>`);
+  setStatus(`<div class="pending">Starte Kategorisierung …</div>`);
 
   let job;
   try {
-    const r = await fetch("/api/lauf", {
+    const r = await fetch("/api/kategorisieren", {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
-        plz, modell: $("#modell").value, no_llm: noLlm,
-        anbieter: "openrouter", key: $("#key").value || undefined
+        plz, modell: $("#modell").value, anbieter:"openrouter",
+        key: $("#key").value || undefined
       })
     });
-    if (!r.ok) throw new Error((await r.json()).detail || r.status);
-    job = (await r.json()).job_id;
-  } catch (e) {
-    setStatus(`<div class="err">${e.message}</div>`); $("#holen").disabled = false; return;
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    job = d.job_id;
+  } catch (e){
+    setStatus(`<div class="err">${esc(e.message)}</div>`); $("#kategorisieren").disabled = false; return;
   }
 
   const poll = setInterval(async () => {
     let s;
     try { s = await (await fetch("/api/lauf/" + job)).json(); }
     catch { return; }
-    if (s.status === "laufend") {
-      if (s.phase === "kategorisieren" && s.total) {
+    if (s.status === "laufend"){
+      if (s.total){
         const pct = Math.round(100 * s.done / s.total);
         setStatus(`<div>Kategorisiere … Batch <b>${s.done}/${s.total}</b>
           <div class="bar"><i style="width:${pct}%"></i></div></div>`);
       } else {
-        setStatus(`<div>${s.phase === "kategorisieren" ? "Kategorisiere …" : "Hole Angebote …"}</div>`);
+        setStatus(`<div class="pending">Kategorisiere …</div>`);
       }
       return;
     }
     clearInterval(poll);
-    $("#holen").disabled = false;
-    if (s.status === "fehler") { setStatus(`<div class="err">${s.fehler}</div>`); return; }
+    $("#kategorisieren").disabled = false;
+    if (s.status === "fehler"){ setStatus(`<div class="err">${esc(s.fehler)}</div>`); return; }
     setStatus("");
     DATEN = s.ergebnis;
     render();
+    $("#result").scrollIntoView({behavior:"smooth", block:"start"});
   }, 1000);
 }
 
-function render() {
+// ----- Ergebnis-Rendering ----------------------------------------------------
+function render(){
   const d = DATEN;
   $("#result").hidden = false;
   $("#summary").innerHTML =
-    `Ort <b>${d.ort_name || d.ort_plz}</b> (PLZ ${d.ort_plz}) · <b>${d.anzahl}</b> Angebote ·
-     Quellen: ${d.quellen.join(", ") || "—"} · <b>${d.unsicher}</b> unsicher`;
+    `Ort <b>${esc(d.ort_name || d.ort_plz)}</b> (PLZ ${esc(d.ort_plz)}) <span class="sep">·</span> <b>${d.anzahl}</b> Angebote <span class="sep">·</span>
+     Quellen: ${d.quellen.map(esc).join(", ") || "—"} <span class="sep">·</span> <b>${d.unsicher}</b> unsicher`;
 
   const fh = $("#fhaendler");
   const aktuell = fh.value;
-  fh.innerHTML = "<option value=''>alle</option>" +
-    d.haendler.map(h => `<option>${esc(h)}</option>`).join("");
+  fh.innerHTML = "<option value=''>alle</option>" + d.haendler.map(h => `<option>${esc(h)}</option>`).join("");
   fh.value = aktuell;
 
   zeichneGruppen();
@@ -220,7 +493,7 @@ function render() {
     d.hinweise.map(h => `<span class="hinweis">${esc(h)}</span>`).join("");
 }
 
-function zeichneGruppen() {
+function zeichneGruppen(){
   const d = DATEN;
   const fH = $("#fhaendler").value;
   const fT = $("#ftext").value.trim().toLowerCase();
@@ -228,7 +501,7 @@ function zeichneGruppen() {
   const box = $("#gruppen");
   box.innerHTML = "";
 
-  for (const g of d.gruppen) {
+  for (const g of d.gruppen){
     const items = g.angebote.filter(a =>
       (!fH || a.haendler === fH) &&
       (!nurSicher || !a.unsicher) &&
@@ -236,11 +509,11 @@ function zeichneGruppen() {
     );
     const sec = document.createElement("section");
     sec.className = "grp";
-    const h = document.createElement("h2");
+    const h = document.createElement("h3");
     h.innerHTML = `<span>${esc(g.name)}</span><span class="cnt">${items.length}</span>`;
     h.onclick = () => sec.classList.toggle("zu");
     sec.appendChild(h);
-    if (!items.length) {
+    if (!items.length){
       const p = document.createElement("div"); p.className = "leer";
       p.textContent = (fH || fT || nurSicher) ? "keine Treffer im Filter" : "keine Angebote";
       sec.appendChild(p);
@@ -253,58 +526,45 @@ function zeichneGruppen() {
   }
 }
 
-function zeile(a) {
+function zeile(a){
   const li = document.createElement("li");
   li.className = "ang" + (a.unsicher ? " unsicher" : "");
   const marke = a.marke ? `<span class="marke">${esc(a.marke)}</span> ` : "";
-  const menge = a.menge ? ` · ${esc(a.menge)}` : "";
+  const menge = a.menge ? ` <span class="sep">·</span> ${esc(a.menge)}` : "";
   const gueltig = (a.gueltig_von || a.gueltig_bis)
-    ? ` · gültig ${a.gueltig_von||"?"}–${a.gueltig_bis||"?"}` : "";
-  const preis = a.preis != null
-    ? a.preis.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}) + " €"
-    : "Preis fehlt";
+    ? ` <span class="sep">·</span> gültig ${a.gueltig_von||"?"}–${a.gueltig_bis||"?"}` : "";
   const badge = a.unsicher ? `<span class="badge">unsicher</span>` : "";
   li.innerHTML =
     `<div class="name">${marke}${esc(a.titel)}${badge}</div>` +
-    `<div class="preis">${preis}</div>` +
+    `<div class="preis">${preisFmt(a.preis)}</div>` +
     `<div class="meta"><span class="haendler">${esc(a.haendler)}</span>${menge}${gueltig}
        &nbsp;<span class="quelle" title="${esc(a.quelle)}">${esc((a.quelle||"").slice(0,42))}</span></div>` +
     `<div class="grund">${a.grundpreis ? esc(a.grundpreis) : ""}</div>`;
   return li;
 }
 
-function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
-
-// Events
-$("#holen").onclick = starteLauf;
+// ----- Events ----------------------------------------------------------------
+$("#rohholen").onclick = holeRohdaten;
+$("#kategorisieren").onclick = kategorisiere;
 $("#refresh").onclick = () => ladeModelle($("#modellsuche").value.trim());
 $("#modellsuche").addEventListener("keydown", e => { if (e.key==="Enter") ladeModelle(e.target.value.trim()); });
-$("#keytoggle").onclick = () => $("#keyrow").classList.toggle("show");
+$("#plz").addEventListener("keydown", e => { if (e.key==="Enter") holeRohdaten(); });
+let _plzTimer;
+$("#plz").addEventListener("input", () => {
+  clearTimeout(_plzTimer);
+  const plz = $("#plz").value.trim();
+  _plzTimer = setTimeout(() => pruefeRohstand(plz), 350);
+});
 for (const id of ["#fhaendler","#ftext","#fsicher"])
   $(id).addEventListener("input", () => DATEN && zeichneGruppen());
-$("#plz").addEventListener("keydown", e => { if (e.key==="Enter") starteLauf(); });
 
-// Auto-Start per URL-Param: ?plz=60487[&no_llm=1][&modell=...]
+// ----- Init ------------------------------------------------------------------
+ladeModelle();
+
+// Auto: ?plz=… vorbelegen (überschreibt den Default), dann GENAU EINMAL prüfen.
 const _p = new URLSearchParams(location.search);
-if (_p.get("plz")) {
-  $("#plz").value = _p.get("plz");
-  if (_p.get("no_llm")) $("#nollm").checked = true;
-  ladeModelle().then(() => {
-    const m = _p.get("modell");
-    if (m) {
-      const sel = $("#modell");
-      if (![...sel.options].some(o => o.value === m)) {
-        const o = document.createElement("option");
-        o.value = o.textContent = m;
-        sel.insertBefore(o, sel.firstChild);
-      }
-      sel.value = m;
-    }
-    starteLauf();
-  });
-} else {
-  ladeModelle();
-}
+if (_p.get("plz")) $("#plz").value = _p.get("plz").trim();
+pruefeRohstand($("#plz").value.trim());
 </script>
 </body>
 </html>

@@ -1,15 +1,18 @@
 """Web-Schicht -- offline. Struktur-Funktion + Endpoints (ohne Netz/Key/LLM).
 
-Der Schnitt gilt auch hier: die Web-Schicht fügt keine Logik hinzu, sie ruft
-die getesteten Module auf. Geprüft wird, dass sie das belegt-und-ehrlich
-weiterreicht.
+Der Schnitt gilt auch hier und ist im Endpoint-Schnitt sichtbar:
+  * Stufe 1 (/api/rohdaten) holt + speichert deterministisch -- ohne Key.
+  * Stufe 2 (/api/kategorisieren) ist gesperrt, solange keine Rohdaten vorliegen.
+
+Geprüft wird, dass die Web-Schicht das belegt-und-ehrlich weiterreicht und die
+zwei Stufen sauber trennt -- ohne dabei selbst zu fetchen oder ein LLM zu rufen.
 """
 
 import pytest
 
 from angebote.modell import FetchErgebnis, KategorisiertesAngebot
 from angebote.uebersicht import als_struktur
-from tests.fakes import beispiel_angebot
+from tests.fakes import FakeQuelle, beispiel_angebot
 
 fastapi = pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
@@ -66,13 +69,83 @@ def test_api_modelle_gibt_top_free(monkeypatch):
     assert daten[0]["frei"] is True
 
 
-def test_api_lauf_ohne_plz_ist_400():
-    client = TestClient(web.app)
-    r = client.post("/api/lauf", json={"plz": ""})
-    assert r.status_code == 400
-
-
 def test_api_status_unbekannt_ist_404():
     client = TestClient(web.app)
     r = client.get("/api/lauf/gibtsnicht")
     assert r.status_code == 404
+
+
+# === Stufe 1: Rohdaten holen & speichern (deterministisch, ohne Key) =========
+
+
+def test_api_rohdaten_ohne_plz_ist_400():
+    client = TestClient(web.app)
+    r = client.post("/api/rohdaten", json={"plz": ""})
+    assert r.status_code == 400
+
+
+def test_api_rohdaten_holen_speichert_und_laedt(tmp_path, monkeypatch):
+    """Stufe 1 fetcht (über Fake-Quelle, kein Netz), speichert, und GET liefert es."""
+    # Persistenz in tmp lenken -- der Default-Pfad bleibt unangetastet.
+    monkeypatch.setattr("angebote.speicher.STANDARD_BASIS", tmp_path / "roh")
+    # Fetch über eine Fake-Quelle: kein Netz, kein Schlüssel, deterministisch.
+    a = beispiel_angebot("Bio-Banane", haendler="ALDI SÜD", preis=1.29)
+    quelle = FakeQuelle("fake", [a])
+    monkeypatch.setattr("angebote.fetch.standard_quellen", lambda: [quelle])
+
+    client = TestClient(web.app)
+    r = client.post("/api/rohdaten", json={"plz": "60487"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["plz"] == "60487"
+    assert d["anzahl"] == 1
+    assert "ALDI SÜD" in d["haendler"]
+    assert d["angebote"][0]["titel"] == "Bio-Banane"
+    assert d["abgerufen_am"]  # belegt
+
+    # Datei wurde geschrieben (data/roh-Äquivalent im tmp)
+    geschrieben = list((tmp_path / "roh").glob("60487_*.json"))
+    assert geschrieben, "Rohdaten-Datei wurde nicht persistiert"
+
+    # GET liefert den gespeicherten Stand zurück (kein erneutes Fetchen nötig).
+    g = client.get("/api/rohdaten/60487")
+    assert g.status_code == 200
+    assert g.json()["angebote"][0]["titel"] == "Bio-Banane"
+
+
+def test_api_rohdaten_holen_abbruch_ist_422(monkeypatch, tmp_path):
+    """Ehrlicher Abbruch (Regel 4) wird als 422 mit Ursache/Vorschlag gemeldet."""
+    monkeypatch.setattr("angebote.speicher.STANDARD_BASIS", tmp_path / "roh")
+    # Keine Quelle deckt den Ort ab -> AbbruchFehler.
+    quelle = FakeQuelle("fake", [], deckt=False)
+    monkeypatch.setattr("angebote.fetch.standard_quellen", lambda: [quelle])
+
+    client = TestClient(web.app)
+    r = client.post("/api/rohdaten", json={"plz": "60487"})
+    assert r.status_code == 422
+    assert "Abbruch" in r.json()["detail"]
+
+
+def test_api_rohdaten_laden_ohne_stand_ist_404(monkeypatch, tmp_path):
+    monkeypatch.setattr("angebote.speicher.STANDARD_BASIS", tmp_path / "roh")
+    client = TestClient(web.app)
+    r = client.get("/api/rohdaten/99999")
+    assert r.status_code == 404
+
+
+# === Stufe 2: Kategorisieren -- gesperrt ohne Rohdaten =======================
+
+
+def test_api_kategorisieren_ohne_rohdaten_ist_400(monkeypatch, tmp_path):
+    """Stufe 2 ist hart gesperrt, solange keine Rohdaten gespeichert sind."""
+    monkeypatch.setattr("angebote.speicher.STANDARD_BASIS", tmp_path / "roh")
+    client = TestClient(web.app)
+    r = client.post("/api/kategorisieren", json={"plz": "60487"})
+    assert r.status_code == 400
+    assert "Rohdaten" in r.json()["detail"]
+
+
+def test_api_kategorisieren_ohne_plz_ist_400():
+    client = TestClient(web.app)
+    r = client.post("/api/kategorisieren", json={"plz": ""})
+    assert r.status_code == 400

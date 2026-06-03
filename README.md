@@ -1,4 +1,4 @@
-# Angebots-Übersicht
+# MABOTO — Marktbeobachtungstool
 
 [![tests](https://github.com/Jeuners/timopro/actions/workflows/tests.yml/badge.svg)](https://github.com/Jeuners/timopro/actions/workflows/tests.yml)
 

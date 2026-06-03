@@ -23,13 +23,14 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 
 from .fehler import AbbruchFehler
 
-app = FastAPI(title="Angebots-Übersicht")
+app = FastAPI(title="MABOTO — Marktbeobachtungstool")
 
 _HTML = (Path(__file__).parent / "web_static" / "index.html").read_text("utf-8")
+_FAVICON = (Path(__file__).parent / "web_static" / "favicon.svg").read_text("utf-8")
 
 # In-memory Job-Store für Stufe 2 (LLM, läuft im Thread). Schlicht gehalten --
 # ein lokales Single-User-Werkzeug.
@@ -44,6 +45,12 @@ _ergebnis_cache: dict[tuple, dict] = {}
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
     return _HTML
+
+
+@app.get("/favicon.svg")
+def favicon() -> Response:
+    return Response(content=_FAVICON, media_type="image/svg+xml",
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/modelle")

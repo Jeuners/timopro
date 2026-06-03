@@ -51,7 +51,15 @@ def test_index_liefert_html():
     client = TestClient(web.app)
     r = client.get("/")
     assert r.status_code == 200
-    assert "Angebots-Übersicht" in r.text
+    assert "MABOTO" in r.text
+
+
+def test_favicon_liefert_svg():
+    client = TestClient(web.app)
+    r = client.get("/favicon.svg")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/svg+xml")
+    assert "<svg" in r.text
 
 
 def test_api_modelle_gibt_top_free(monkeypatch):

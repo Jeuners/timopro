@@ -6,7 +6,10 @@
 <meta name="color-scheme" content="light dark" />
 <meta name="theme-color" content="#0e5d42" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#13120d" media="(prefers-color-scheme: dark)" />
-<title>Angebots-Übersicht</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="favicon.svg" />
+<title>MABOTO — Marktbeobachtungstool</title>
+<meta name="description" content="MABOTO — Marktbeobachtungstool: ortskonkrete, händlerübergreifende Übersicht der wöchentlichen Angebote, nach Produktgruppen." />
 <style>
   /* ============================================================
      Farb-Tokens — AAA-verifiziert (jedes Text-Paar >=7:1,
@@ -72,8 +75,11 @@
   }
   .appbar-inner { max-width:1100px; margin:0 auto; height:100%; padding:0 var(--s6);
     display:flex; align-items:center; gap:var(--s3); }
-  .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:17px;
+  .brand { display:flex; align-items:center; gap:11px; font-weight:800; font-size:17px;
     letter-spacing:-.02em; color:var(--ink); text-decoration:none; }
+  .brand .word { display:flex; flex-direction:column; line-height:1.04; }
+  .brand .word small { font-size:10px; font-weight:700; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--muted); margin-top:1px; }
   .brand .logo {
     width:34px; height:34px; border-radius:10px; flex:none; display:grid; place-items:center;
     background:linear-gradient(145deg,var(--brand),color-mix(in srgb,var(--brand) 70%, #000 12%));
@@ -339,9 +345,17 @@
 
 <header class="appbar">
   <div class="appbar-inner">
-    <a class="brand" href="#" aria-label="Angebots-Übersicht — Start">
-      <span class="logo" aria-hidden="true">🛒</span>
-      <span class="word">Angebote</span>
+    <a class="brand" href="#" aria-label="MABOTO — Marktbeobachtungstool, zum Anfang">
+      <span class="logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="6.2" y="9.0"  width="1.7" height="3.6" rx="0.5" fill="#fff"/>
+          <rect x="8.1" y="7.2"  width="1.7" height="5.4" rx="0.5" fill="#fff"/>
+          <rect x="10.0" y="5.4" width="1.7" height="7.2" rx="0.5" fill="#fff"/>
+          <circle cx="9.2" cy="9.2" r="6.1" fill="none" stroke="#fff" stroke-width="1.9"/>
+          <path d="M13.7 13.7 L18.6 18.6" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="word">MABOTO<small>Marktbeobachtung</small></span>
     </a>
     <span class="place leer" id="appbarPlz" aria-live="polite">PLZ …</span>
     <span class="spacer"></span>
@@ -350,11 +364,12 @@
 </header>
 
 <div class="intro">
-  <p class="eyebrow">Ortskonkret · händlerübergreifend · belegt</p>
-  <h1>Angebots-Übersicht</h1>
-  <p>Zwei strikt getrennte Stufen: zuerst die Rohdaten <b>deterministisch</b> holen
-     und speichern (kein LLM, kein Key), danach erst per LLM in Produktgruppen
-     einordnen. Jedes Angebot ist belegt — kein Auffüllen, Unsicheres ist markiert.</p>
+  <p class="eyebrow">MABOTO · ortskonkret · händlerübergreifend · belegt</p>
+  <h1>MABOTO</h1>
+  <p><b>Marktbeobachtungstool.</b> Zwei strikt getrennte Stufen: zuerst die Rohdaten
+     <b>deterministisch</b> holen und speichern (kein LLM, kein Key), danach erst per
+     LLM in Produktgruppen einordnen. Jedes Angebot ist belegt — kein Auffüllen,
+     Unsicheres ist markiert.</p>
 </div>
 
 <div class="wrap">

@@ -7,4 +7,6 @@ Der Schnitt (siehe CLAUDE.md) ist auch in der Paketstruktur sichtbar:
 
 from .modell import Angebot, FetchErgebnis, KategorisiertesAngebot
 
-__all__ = ["Angebot", "FetchErgebnis", "KategorisiertesAngebot"]
+__version__ = "0.1.0"
+
+__all__ = ["Angebot", "FetchErgebnis", "KategorisiertesAngebot", "__version__"]

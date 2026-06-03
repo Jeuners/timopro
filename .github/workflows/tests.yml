@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python 3.12 einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Abhängigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Playwright-Browser (für den E2E-Test)
+        run: python -m playwright install --with-deps chromium
+
+      - name: Testsuite (Architektur-Regeln, Cache, Web, E2E)
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q

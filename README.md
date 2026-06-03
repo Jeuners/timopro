@@ -1,32 +1,108 @@
 # Angebots-Übersicht
 
+[![tests](https://github.com/Jeuners/timopro/actions/workflows/tests.yml/badge.svg)](https://github.com/Jeuners/timopro/actions/workflows/tests.yml)
+
 Ortskonkrete, händlerübergreifende Übersicht wöchentlicher Supermarkt-Angebote,
 geordnet nach Produktgruppen. Neutral, nicht als Hochglanzprospekt.
 
-## Der Gedanke
+**Live-Demo:** <https://dev.dillenberg.net/angebote/>
 
-Die Aufgabe sieht nach einer KI-Aufgabe aus, ist es aber nur zur Hälfte. Sie
+---
+
+## Worum es hier eigentlich geht
+
+Dieses Repo ist mehr als ein Angebots-Tool. Es ist eine **Referenz dafür, wie
+man KI *richtig* einsetzt** -- nicht, indem man die ganze Aufgabe einem Modell
+übergibt, sondern indem man genau trennt, was deterministisch gehört und was
+nur ein LLM kann. Wer die fünf Punkte unten versteht, hat das Wesentliche.
+
+### 1. Der Schnitt: Vor KI muss man erst KI einsparen
+
+Die Aufgabe *sieht* nach einer KI-Aufgabe aus. Sie ist es nur zur Hälfte. Sie
 zerfällt in zwei strikt getrennte Teile:
 
-1. **Daten holen** -- deterministisch, ohne LLM. (Skill `angebote-fetch`)
-2. **Kategorisieren** -- die echte Ambiguität, hier gehört das LLM hin.
-   (Skill `angebote-kategorisieren`)
+| Teil | Wesen | Werkzeug |
+|---|---|---|
+| **Daten holen** (Preise, Gültigkeiten, Händler an Ort X) | reproduzierbar, exakt | **kein LLM** -- HTTP + Parser |
+| **Kategorisieren** (ist Toffifee Süßware? gehört eine Blühpflanze in eine Lebensmittelliste?) | echte Ambiguität | **LLM** -- und nur hier |
 
-Wer alles dem Modell gibt, bekommt erfundene Preise. Wer alles deterministisch
-löst, scheitert an der Einordnung. Die Architektur erzwingt den Schnitt.
+> Wer alles dem Modell gibt, bekommt erfundene Preise. Wer alles deterministisch
+> löst, scheitert an der Einordnung. Richtig ist die Arbeitsteilung.
 
-Der zweite Punkt, der dieses Projekt trägt: Qualitätsregeln stehen nicht als
-gut gemeinte Bitten im Code, sondern als prüfbare Bedingungen -- kein
-Auffüllen, nur Belegtes, Abbruch statt stiller Drift. Genau dadurch "sagt das
-System, wenn es scheitert": nicht aus Einsicht des Modells, sondern weil eine
-externe Bedingung es erzwingt.
+Im Code ist dieser Schnitt nicht verhandelbar: Der Fetch-Teil enthält **keinen
+einzigen LLM-Aufruf** -- ein Test (`tests/`) prüft genau das.
 
-## Entwicklung mit Claude Code
+### 2. Architektur statt Präferenz: Qualität als prüfbare Bedingung
 
-`CLAUDE.md` ist der verbindliche Leitfaden. Die beiden `SKILL.md` in
-`.claude/skills/` sind die Spezifikationen der zwei Teile. Claude Code liest
-sie automatisch -- beim Arbeiten am jeweiligen Teil zuerst die passende
-SKILL.md lesen.
+Eine Regel, die nur als höfliche Bitte im Prompt steht („möglichst keine
+erfundenen Preise"), bricht unter Druck still weg. Eine Regel, die als
+**prüfbare Bedingung im Datenfluss** steht, hält. Drei solcher Regeln sind hier
+festverdrahtet -- und durch Tests abgesichert:
+
+- **Kein Auffüllen.** Keine belegten Angebote für eine Gruppe → „keine Daten",
+  niemals ein plausibel klingendes erfundenes Beispiel.
+- **Nur Belegtes.** Preis, Gültigkeit, Händler stammen aus dem Datensatz, nicht
+  aus dem Modell. Fehlendes Feld = als fehlend markiert, nicht geraten.
+- **Abbruch statt stiller Drift.** Gibt die Datenlage die Anforderung nicht her
+  (kein Treffer für den Ort), bricht das Programm mit klarer Ursache + Vorschlag
+  ab -- statt ein „irgendwie vollständig aussehendes" Ergebnis zu liefern.
+
+Deshalb „sagt das System, wenn es scheitert" -- nicht aus Einsicht des Modells,
+sondern weil eine externe Bedingung es erzwingt.
+
+### 3. Der Cache macht ein Mini-Model möglich
+
+Jedes vom LLM (oder per Hand) eingeordnete Produkt landet in einem schnellen
+SQLite-Cache (`titel+marke → gruppe`, modell-agnostischer Schlüssel). Beim
+nächsten Lauf überspringen bekannte Produkte das LLM komplett. In der Praxis
+sinkt die LLM-Last über die Wochen drastisch -- bis ein kleines, billiges
+Modell (oder gar keins) für die wenigen Neuzugänge reicht. **KI sparsam machen,
+indem man sie ihre eigene Arbeit zwischenspeichern lässt.**
+
+### 4. Ehrlich über Grenzen
+
+- Lokale Modelle (3-9 B über Ollama) liefern für diese Batch-Tool-Calling-Aufgabe
+  oft *kein* zuverlässiges Ergebnis. Das System rät dann nicht -- es markiert
+  alles als „Sonstiges/unsicher". Der Mangel ist sichtbar, nicht kaschiert.
+- Discounter-Abdeckung wird **datengetrieben** ausgewiesen (beobachtete Händler),
+  nicht behauptet. Die pauschale Annahme „Aldi/Lidl fehlen bei Aggregatoren"
+  wurde von den echten Daten widerlegt -- also steht sie auch nicht im Code.
+
+### 5. Mensch im Loop + sichtbare KI-Arbeit
+
+- Unsichere (oder falsch eingeordnete) Angebote sind per Klick korrigierbar; die
+  Korrektur fließt als **stärkstes Cache-Signal** (`modell="manuell"`) zurück --
+  das Produkt ist danach nie wieder unsicher.
+- Jede LLM-Aktion zeigt **sichtbar Aktivität** (animierter Indikator, Fortschritt,
+  Modellname, Button-Ladezustand). Das ist als Grundregel in `CLAUDE.md`
+  verankert: deterministische Schritte dürfen still laufen, LLM-Schritte nicht.
+
+---
+
+## So sieht es aus
+
+Zweistufige UI -- Rohdaten holen (deterministisch), dann kategorisieren (LLM):
+
+![Zweistufige UI: Rohdaten holen, OpenRouter-Konfig, Kategorisieren](docs/ui-stufen.png)
+
+Die nach Produktgruppen gruppierte Ergebnisansicht nach Stufe 2:
+
+![Gruppierte Übersicht mit Preisen, Händlern, unsicher-Markierung](docs/ui-ergebnis.png)
+
+---
+
+## Die Datenquelle (ehrlich)
+
+Der erste echte Adapter spricht die öffentliche Angebots-API von **marktguru**
+an. Das ist ein **Bildungs-/Recherche-Projekt**, kein Produkt: Der Abruf
+respektiert `robots.txt`, drosselt sich und bricht bei fehlender Erlaubnis
+sauber ab (Regel 4), statt blind weiterzulaufen. Die Quellen-Schicht ist hinter
+einer Adapter-Schnittstelle (`quellen/basis.py`) gekapselt -- ein anderer
+Anbieter mit ausdrücklicher API-Erlaubnis lässt sich ohne Eingriff in den Rest
+ergänzen. Wer das Projekt produktiv nutzen will, klärt die Nutzungsbedingungen
+der jeweiligen Quelle selbst.
+
+---
 
 ## Setup
 
@@ -35,7 +111,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Nutzung
+## Nutzung (CLI)
 
 ```bash
 # PLZ direkt (immer verlässlich):
@@ -52,8 +128,8 @@ python -m angebote 60487 --no-llm
 Der Kategorisier-Schritt braucht einen LLM-Zugang in der Umgebung --
 `OPENROUTER_API_KEY` (empfohlen, viele Modelle) **oder** `ANTHROPIC_API_KEY`.
 Fehlt beides und es wird kein `--no-llm` gesetzt, bricht das Programm ehrlich
-ab, statt ungeordnet weiterzulaufen. Modell überschreiben mit `--modell`,
-Anbieter erzwingen mit `--anbieter openrouter|anthropic`. Modelle auflisten:
+ab. Modell überschreiben mit `--modell`, Anbieter erzwingen mit
+`--anbieter openrouter|anthropic`. Modelle auflisten:
 `python -m angebote --modelle [suchbegriff]`.
 
 ## Web-UI
@@ -63,30 +139,19 @@ gewahrt. Sie macht den **zweistufigen Ablauf** sichtbar und erzwingt seine
 Reihenfolge:
 
 1. **Stufe 1 -- Rohdaten holen & speichern** (deterministisch, kein LLM, kein
-   Key): Abruf für eine PLZ, Persistenz pro PLZ/Woche unter `data/roh/`. Die
-   belegte Rohliste ist für sich ansehbar.
-2. **LLM-Konfiguration** -- separates Panel mit **Anbieter-Umschalter**:
+   Key): Abruf für eine PLZ, Persistenz pro PLZ/Woche unter `data/roh/`.
+2. **LLM-Konfiguration** -- Panel mit **Anbieter-Umschalter**:
    - **OpenRouter** (Cloud): Key + Modellauswahl (Liste/Suche/Aktualisieren).
      Default `deepseek/deepseek-v4-flash` -- günstig (~1-2 Cent/Lauf), verlässlich.
    - **Ollama** (lokal): zeigt die lokal installierten Modelle (kein Key, kein
-     Netz). Ehrlicher Hinweis: kleine lokale Modelle (3-9 B) liefern für diese
-     Batch-Aufgabe oft kein zuverlässiges Tool-Calling -- dann markiert das
-     System alles als „Sonstiges/unsicher" statt zu raten. Brauchbare lokale
-     Kategorisierung braucht ein starkes tool-fähiges Modell.
+     Netz) -- mit ehrlichem Hinweis zur Tool-Calling-Grenze kleiner Modelle.
 
-   Anbieter + Modell werden gemerkt (`localStorage`) und überleben einen Reload.
-   Das gewählte Modell ist dauerhaft sichtbar (Chip im Kopf + im Ergebnis:
-   „kategorisiert mit … (anbieter)").
+   Anbieter + Modell werden gemerkt (`localStorage`) und überleben einen Reload;
+   das gewählte Modell ist dauerhaft sichtbar.
 3. **Stufe 2 -- Kategorisieren** (LLM): läuft **nur auf den gespeicherten
    Rohdaten** und ist gesperrt, solange keine vorliegen. Ergebnis ist die nach
-   Produktgruppen gruppierte Übersicht mit Filtern, Unsicherheits-Markierung
-   und belegter Quelle je Angebot.
-
-![Zweistufige UI: Rohdaten holen, OpenRouter-Konfig, Kategorisieren](docs/ui-stufen.png)
-
-Die gruppierte Ergebnisansicht nach Stufe 2:
-
-![Gruppierte Übersicht mit Preisen, Händlern, unsicher-Markierung](docs/ui-ergebnis.png)
+   Produktgruppen gruppierte Übersicht mit Filtern, Unsicherheits-Markierung,
+   Korrektur-Button und belegter Quelle je Angebot.
 
 Starten:
 
@@ -97,43 +162,30 @@ OPENROUTER_API_KEY=… PYTHONPATH=. uvicorn angebote.web:app --port 8077
 # Browser: http://127.0.0.1:8077/
 ```
 
-Der Key kann auch im UI-Konfigpanel eingegeben werden (bleibt lokal). Die App
-ist als **Single-User-Werkzeug für localhost** gedacht -- nicht mit
-`--host 0.0.0.0` ins Netz stellen (keine Auth auf den Endpoints).
+Die App ist als **Single-User-Werkzeug für localhost** gedacht -- nicht mit
+`--host 0.0.0.0` ungeschützt ins Netz stellen (keine Auth auf den Endpoints).
+Die öffentliche Demo läuft hinter einem Reverse-Proxy als Schaufenster.
 
-## Stand der Implementierung (ehrlich)
+## Tests
 
-- `requirements.txt` -- **vorhanden**.
-- `src/angebote/` -- **vorhanden**: Datenmodell, Adapter-Schnittstelle,
-  Fetch-Orchestrator, Kategorisier-Schritt, Übersicht-Renderer, CLI.
-- `tests/` -- **57 Tests**: Architektur-Regeln (kein Auffüllen, Abbruch bei
-  leerem/unauflösbarem Ort, Daten-Integrität nach Kategorisierung,
-  geschlossene Kategorienliste, Unsicherheits-Flag, Schnitt-Test "kein LLM im
-  Fetch-Teil"), Modell-Discovery/-Auswahl (OpenRouter + Ollama), Anbieter-/
-  Retry-Logik, content-JSON-Fallback, Rohdaten-Persistenz und die Web-Endpoints.
-  Laufen offline; ein E2E-Test (Playwright) prüft die Konfig-Persistenz im
-  Browser.
-- **Web-UI + zweistufiger Flow** -- vorhanden und live verifiziert: Stufe 1
-  (Fetch + Speichern) und Stufe 2 (LLM-Kategorisierung auf den gespeicherten
-  Rohdaten, gesperrt bis Daten da sind) end-to-end gegen PLZ 60487 getestet.
-  Kategorisierung modellstabil (gpt-oss-120b und gemini-3.1-flash-lite liefern
-  praktisch dieselbe Gruppenverteilung).
-- **Live bestätigt:** der marktguru-Adapter wurde gegen die echte API getestet
-  (PLZ 60487) und liefert reale, belegte Angebote (u. a. ALDI SÜD, PENNY, Lidl,
-  REWE, Kaufland, nahkauf). Erkenntnisse aus dem echten Lauf, die direkt in den
-  Code geflossen sind:
-  - `offers/search` ist query-orientiert -- leeres `q` liefert 0 Treffer. Der
-    Adapter aggregiert daher über Kategorie-Seedbegriffe (config) und weist
-    diese **Teilabdeckung** ehrlich aus, statt Vollständigkeit zu behaupten.
-  - Die pauschale Annahme "Aldi/Lidl fehlen bei Aggregatoren" wurde von den
-    Daten **widerlegt** (beide sind enthalten). Die Abdeckung wird deshalb
-    **datengetrieben** ausgewiesen (beobachtete Händler), nicht hartkodiert.
-  - marktgurus Marken-Sentinel `thisisnobrand123` wird als "keine Marke"
-    behandelt, nicht als Beleg durchgereicht.
-- **Voraussetzungen für den Live-Lauf:** installiertes `requests` (certifi für
-  TLS), erreichbares Netz, von der Seite lesbare API-Schlüssel. Fehlt eines
-  davon, ist das der vorgesehene Abbruchfall (Regel 4) mit *zutreffend*
-  benannter Ursache -- keine Krücke.
+```bash
+python -m pytest -q
+```
+
+Die Suite prüft **die Architektur-Regeln**, nicht nur den Happy Path:
+kein Auffüllen, Abbruch bei leerem/unauflösbarem Ort, Daten-Integrität nach der
+Kategorisierung, geschlossene Kategorienliste, Unsicherheits-Flag, der
+Schnitt-Test „kein LLM im Fetch-Teil", Cache-Verhalten (bekannte Produkte
+überspringen das LLM), die Korrektur-zu-Cache-Schleife, Modell-Discovery
+(OpenRouter + Ollama), Anbieter-/Retry-Logik und die Web-Endpoints. Alles läuft
+offline (Fakes); ein E2E-Test (Playwright) prüft die Konfig-Persistenz im Browser.
+CI führt die volle Suite bei jedem Push aus (Badge oben).
+
+## Entwicklung mit Claude Code
+
+`CLAUDE.md` ist der verbindliche Leitfaden. Die beiden `SKILL.md` in
+`.claude/skills/` sind die Spezifikationen der zwei Teile -- beim Arbeiten am
+jeweiligen Teil zuerst die passende SKILL.md lesen, den Schnitt nie vermischen.
 
 ## Struktur
 
@@ -141,6 +193,7 @@ ist als **Single-User-Werkzeug für localhost** gedacht -- nicht mit
 CLAUDE.md                                  Leitfaden / Architektur
 README.md                                  dieses Dokument
 requirements.txt                           Abhängigkeiten
+.github/workflows/tests.yml                CI: volle Testsuite bei jedem Push
 docs/                                      Screenshots für dieses Dokument
 .claude/skills/angebote-fetch/             Spec: deterministischer Datenabruf
 .claude/skills/angebote-kategorisieren/    Spec: LLM-gestützte Einordnung
@@ -154,12 +207,18 @@ src/angebote/                              Implementierung
   fetch.py         Orchestrator (Ort rein, belegte Angebote raus)
   speicher.py      Persistenz der belegten Rohdaten (Stufe 1), kein LLM
   kategorisieren.py LLM-Schritt hinter Protokoll (OpenRouter/Anthropic), testbar
+  produktcache.py  schneller SQLite-Cache (titel+marke -> gruppe), kein LLM
   modelle.py       OpenRouter-Modell-Discovery (Liste/Suche/Top-Free)
   modellauswahl.py interaktive Modellauswahl (CLI)
   uebersicht.py    Gruppierung + Rendering (Markdown + JSON-Struktur)
-  web.py           FastAPI-Web-UI (Stufe-1-/Stufe-2-Endpoints)
+  web.py           FastAPI-Web-UI (Stufe-1-/Stufe-2-/Korrektur-Endpoints)
   web_static/      Frontend (index.html)
   cli.py / __main__.py  CLI-Einstieg
-tests/                                     57 Architektur-/Web-/E2E-Tests
+tests/                                     Architektur-/Cache-/Web-/E2E-Tests
 data/roh/                                  generierte Rohdaten (ge-ignored)
+data/kategorie_cache.sqlite                Produkt->Kategorie-Cache (ge-ignored)
 ```
+
+## Lizenz
+
+[MIT](LICENSE).

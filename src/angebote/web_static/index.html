@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Angebots-Übersicht</title>
+<style>
+  :root {
+    --bg:#f6f5f2; --panel:#ffffff; --ink:#1c1b19; --muted:#6b6864;
+    --line:#e2ded7; --accent:#1f6f53; --accent-weak:#e7f1ec;
+    --warn:#9a6a00; --warn-bg:#fdf3df; --price:#11221b;
+    --radius:10px; --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  header.top {
+    padding:22px 26px 16px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  header.top h1 { margin:0; font-size:20px; letter-spacing:-.01em; }
+  header.top p { margin:4px 0 0; color:var(--muted); font-size:13px; max-width:60ch; }
+  .wrap { max-width:1040px; margin:0 auto; padding:20px 26px 80px; }
+
+  .controls {
+    display:flex; flex-wrap:wrap; gap:10px 14px; align-items:end;
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; margin-bottom:18px;
+  }
+  .field { display:flex; flex-direction:column; gap:4px; }
+  .field label { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  input, select, button { font:inherit; }
+  input[type=text], select {
+    padding:8px 10px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink);
+  }
+  input#plz { width:90px; font-variant-numeric:tabular-nums; }
+  select#modell { min-width:230px; }
+  input#modellsuche { width:130px; }
+  .check { flex-direction:row; align-items:center; gap:7px; }
+  .check label { text-transform:none; letter-spacing:0; font-size:13px; color:var(--ink); }
+  button {
+    padding:9px 16px; border:1px solid var(--accent); border-radius:7px;
+    background:var(--accent); color:#fff; cursor:pointer; font-weight:600;
+  }
+  button.ghost { background:#fff; color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  button.icon { padding:8px 11px; }
+
+  .keyrow { width:100%; display:none; gap:8px; align-items:center; margin-top:4px; }
+  .keyrow.show { display:flex; }
+  .keyrow input { flex:1; }
+  .keytoggle { background:none; border:none; color:var(--muted); cursor:pointer; font-size:12px; text-decoration:underline; padding:0; }
+
+  #status { margin:14px 0; min-height:22px; font-size:14px; }
+  .bar { height:8px; background:var(--line); border-radius:5px; overflow:hidden; margin-top:8px; }
+  .bar > i { display:block; height:100%; width:0; background:var(--accent); transition:width .25s; }
+  .err { background:var(--warn-bg); border:1px solid #eccf8a; color:#5a3d00; padding:12px 14px; border-radius:8px; white-space:pre-wrap; font-family:var(--mono); font-size:13px; }
+
+  .summary { display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; color:var(--muted); font-size:13px; margin:6px 0 14px; }
+  .summary b { color:var(--ink); }
+  .filters { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:end; margin-bottom:18px; }
+
+  section.grp { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:12px; overflow:hidden; }
+  section.grp > h2 {
+    margin:0; padding:11px 16px; font-size:14px; display:flex; justify-content:space-between;
+    align-items:center; cursor:pointer; background:linear-gradient(#fff,#fbfaf7); border-bottom:1px solid var(--line);
+  }
+  section.grp > h2 .cnt { color:var(--muted); font-weight:500; font-variant-numeric:tabular-nums; }
+  section.grp.zu ul { display:none; }
+  section.grp ul { list-style:none; margin:0; padding:4px 0; }
+  li.ang { display:grid; grid-template-columns:1fr auto; gap:2px 14px; padding:9px 16px; border-bottom:1px solid #f1edea; align-items:baseline; }
+  li.ang:last-child { border-bottom:none; }
+  .ang .name { font-weight:600; }
+  .ang .name .marke { color:var(--accent); }
+  .ang .meta { grid-column:1; color:var(--muted); font-size:12.5px; }
+  .ang .meta .haendler { color:var(--ink); background:var(--accent-weak); padding:1px 6px; border-radius:5px; }
+  .ang .preis { grid-column:2; grid-row:1; text-align:right; font-weight:700; color:var(--price); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ang .grund { grid-column:2; grid-row:2; text-align:right; color:var(--muted); font-size:12px; white-space:nowrap; }
+  .ang.unsicher { background:var(--warn-bg); }
+  .badge { display:inline-block; font-size:11px; background:var(--warn-bg); color:var(--warn); border:1px solid #eccf8a; border-radius:5px; padding:0 6px; margin-left:6px; }
+  .leer { padding:12px 16px; color:var(--muted); font-style:italic; }
+  .quelle { font-family:var(--mono); font-size:11px; color:#9a968f; }
+
+  footer.note { margin-top:22px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; }
+  footer.note .haendler { color:var(--ink); }
+  footer.note .hinweis { display:block; margin-top:6px; font-style:italic; }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Angebots-Übersicht</h1>
+  <p>Ortskonkret, händlerübergreifend, nach Produktgruppen. Daten deterministisch aus marktguru,
+     Einordnung per LLM. Jedes Angebot ist belegt — kein Auffüllen, Unsicheres ist markiert.</p>
+</header>
+
+<div class="wrap">
+  <div class="controls">
+    <div class="field"><label for="plz">PLZ</label><input id="plz" type="text" value="60487" inputmode="numeric" /></div>
+    <div class="field">
+      <label for="modell">Modell</label>
+      <select id="modell"><option>lädt…</option></select>
+    </div>
+    <div class="field"><label for="modellsuche">Modell suchen</label><input id="modellsuche" type="text" placeholder="z.B. qwen" /></div>
+    <div class="field"><label>&nbsp;</label><button id="refresh" class="ghost icon" title="Modell-Liste aktualisieren">↻</button></div>
+    <div class="field check"><input id="nollm" type="checkbox" /><label for="nollm">ohne LLM (Rohliste)</label></div>
+    <div class="field"><label>&nbsp;</label><button id="holen">Holen ▶</button></div>
+    <button type="button" class="keytoggle" id="keytoggle">API-Key setzen (optional)</button>
+    <div class="keyrow" id="keyrow">
+      <input id="key" type="password" placeholder="OPENROUTER_API_KEY (bleibt lokal, nur an deinen Server)" />
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="result" hidden>
+    <div class="summary" id="summary"></div>
+    <div class="filters">
+      <div class="field"><label for="fhaendler">Händler</label><select id="fhaendler"><option value="">alle</option></select></div>
+      <div class="field"><label for="ftext">Angebot suchen</label><input id="ftext" type="text" placeholder="Titel…" /></div>
+      <div class="field check"><input id="fsicher" type="checkbox" /><label for="fsicher">nur sichere</label></div>
+    </div>
+    <div id="gruppen"></div>
+    <footer class="note" id="footer"></footer>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let DATEN = null;
+
+async function ladeModelle(q="") {
+  const sel = $("#modell");
+  try {
+    const r = await fetch("/api/modelle?q=" + encodeURIComponent(q));
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    const liste = await r.json();
+    sel.innerHTML = "";
+    if (!liste.length) { sel.innerHTML = "<option value=''>(keine Treffer)</option>"; return; }
+    for (const m of liste) {
+      const o = document.createElement("option");
+      o.value = m.id;
+      const tag = m.frei ? "FREE" : "paid";
+      const tools = m.tools ? "" : " ⚠ kein tool-calling";
+      o.textContent = `${m.id}  [${tag}]${tools}`;
+      if (!m.tools) o.disabled = true;
+      sel.appendChild(o);
+    }
+  } catch (e) {
+    sel.innerHTML = `<option value=''>Modelle nicht abrufbar</option>`;
+    setStatus(`<div class="err">Modelle nicht abrufbar: ${e.message}</div>`);
+  }
+}
+
+function setStatus(html) { $("#status").innerHTML = html; }
+
+async function starteLauf() {
+  const plz = $("#plz").value.trim();
+  if (!plz) { setStatus(`<div class="err">Bitte eine PLZ eingeben.</div>`); return; }
+  $("#holen").disabled = true;
+  $("#result").hidden = true;
+  const noLlm = $("#nollm").checked;
+  setStatus(`<div>Hole Angebote für <b>${plz}</b> …</div>`);
+
+  let job;
+  try {
+    const r = await fetch("/api/lauf", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        plz, modell: $("#modell").value, no_llm: noLlm,
+        anbieter: "openrouter", key: $("#key").value || undefined
+      })
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || r.status);
+    job = (await r.json()).job_id;
+  } catch (e) {
+    setStatus(`<div class="err">${e.message}</div>`); $("#holen").disabled = false; return;
+  }
+
+  const poll = setInterval(async () => {
+    let s;
+    try { s = await (await fetch("/api/lauf/" + job)).json(); }
+    catch { return; }
+    if (s.status === "laufend") {
+      if (s.phase === "kategorisieren" && s.total) {
+        const pct = Math.round(100 * s.done / s.total);
+        setStatus(`<div>Kategorisiere … Batch <b>${s.done}/${s.total}</b>
+          <div class="bar"><i style="width:${pct}%"></i></div></div>`);
+      } else {
+        setStatus(`<div>${s.phase === "kategorisieren" ? "Kategorisiere …" : "Hole Angebote …"}</div>`);
+      }
+      return;
+    }
+    clearInterval(poll);
+    $("#holen").disabled = false;
+    if (s.status === "fehler") { setStatus(`<div class="err">${s.fehler}</div>`); return; }
+    setStatus("");
+    DATEN = s.ergebnis;
+    render();
+  }, 1000);
+}
+
+function render() {
+  const d = DATEN;
+  $("#result").hidden = false;
+  $("#summary").innerHTML =
+    `Ort <b>${d.ort_name || d.ort_plz}</b> (PLZ ${d.ort_plz}) · <b>${d.anzahl}</b> Angebote ·
+     Quellen: ${d.quellen.join(", ") || "—"} · <b>${d.unsicher}</b> unsicher`;
+
+  const fh = $("#fhaendler");
+  const aktuell = fh.value;
+  fh.innerHTML = "<option value=''>alle</option>" +
+    d.haendler.map(h => `<option>${esc(h)}</option>`).join("");
+  fh.value = aktuell;
+
+  zeichneGruppen();
+
+  $("#footer").innerHTML =
+    `<span class="haendler"><b>Beobachtete Händler (belegt):</b> ${d.haendler.map(esc).join(", ")}.</span>` +
+    d.hinweise.map(h => `<span class="hinweis">${esc(h)}</span>`).join("");
+}
+
+function zeichneGruppen() {
+  const d = DATEN;
+  const fH = $("#fhaendler").value;
+  const fT = $("#ftext").value.trim().toLowerCase();
+  const nurSicher = $("#fsicher").checked;
+  const box = $("#gruppen");
+  box.innerHTML = "";
+
+  for (const g of d.gruppen) {
+    const items = g.angebote.filter(a =>
+      (!fH || a.haendler === fH) &&
+      (!nurSicher || !a.unsicher) &&
+      (!fT || (a.titel + " " + (a.marke||"")).toLowerCase().includes(fT))
+    );
+    const sec = document.createElement("section");
+    sec.className = "grp";
+    const h = document.createElement("h2");
+    h.innerHTML = `<span>${esc(g.name)}</span><span class="cnt">${items.length}</span>`;
+    h.onclick = () => sec.classList.toggle("zu");
+    sec.appendChild(h);
+    if (!items.length) {
+      const p = document.createElement("div"); p.className = "leer";
+      p.textContent = (fH || fT || nurSicher) ? "keine Treffer im Filter" : "keine Angebote";
+      sec.appendChild(p);
+    } else {
+      const ul = document.createElement("ul");
+      for (const a of items) ul.appendChild(zeile(a));
+      sec.appendChild(ul);
+    }
+    box.appendChild(sec);
+  }
+}
+
+function zeile(a) {
+  const li = document.createElement("li");
+  li.className = "ang" + (a.unsicher ? " unsicher" : "");
+  const marke = a.marke ? `<span class="marke">${esc(a.marke)}</span> ` : "";
+  const menge = a.menge ? ` · ${esc(a.menge)}` : "";
+  const gueltig = (a.gueltig_von || a.gueltig_bis)
+    ? ` · gültig ${a.gueltig_von||"?"}–${a.gueltig_bis||"?"}` : "";
+  const preis = a.preis != null
+    ? a.preis.toLocaleString("de-DE",{minimumFractionDigits:2,maximumFractionDigits:2}) + " €"
+    : "Preis fehlt";
+  const badge = a.unsicher ? `<span class="badge">unsicher</span>` : "";
+  li.innerHTML =
+    `<div class="name">${marke}${esc(a.titel)}${badge}</div>` +
+    `<div class="preis">${preis}</div>` +
+    `<div class="meta"><span class="haendler">${esc(a.haendler)}</span>${menge}${gueltig}
+       &nbsp;<span class="quelle" title="${esc(a.quelle)}">${esc((a.quelle||"").slice(0,42))}</span></div>` +
+    `<div class="grund">${a.grundpreis ? esc(a.grundpreis) : ""}</div>`;
+  return li;
+}
+
+function esc(s){ return (s==null?"":String(s)).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// Events
+$("#holen").onclick = starteLauf;
+$("#refresh").onclick = () => ladeModelle($("#modellsuche").value.trim());
+$("#modellsuche").addEventListener("keydown", e => { if (e.key==="Enter") ladeModelle(e.target.value.trim()); });
+$("#keytoggle").onclick = () => $("#keyrow").classList.toggle("show");
+for (const id of ["#fhaendler","#ftext","#fsicher"])
+  $(id).addEventListener("input", () => DATEN && zeichneGruppen());
+$("#plz").addEventListener("keydown", e => { if (e.key==="Enter") starteLauf(); });
+
+// Auto-Start per URL-Param: ?plz=60487[&no_llm=1][&modell=...]
+const _p = new URLSearchParams(location.search);
+if (_p.get("plz")) {
+  $("#plz").value = _p.get("plz");
+  if (_p.get("no_llm")) $("#nollm").checked = true;
+  ladeModelle().then(() => {
+    const m = _p.get("modell");
+    if (m) {
+      const sel = $("#modell");
+      if (![...sel.options].some(o => o.value === m)) {
+        const o = document.createElement("option");
+        o.value = o.textContent = m;
+        sel.insertBefore(o, sel.firstChild);
+      }
+      sel.value = m;
+    }
+    starteLauf();
+  });
+} else {
+  ladeModelle();
+}
+</script>
+</body>
+</html>

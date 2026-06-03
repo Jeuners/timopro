@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.cache/
+.pytest_cache/
+.DS_Store
+
+# generierte Ausgaben / lokale Artefakte
+*.err
+/angebote-*.md
+
+# Original-Input-Archive (Specs liegen kanonisch in .claude/skills/)
+/files.zip
+/temp/

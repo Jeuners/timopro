@@ -1,0 +1,15 @@
+# Fetch-Teil (deterministisch, KEIN LLM) UND OpenRouter-Kategorisierung:
+requests>=2.31
+
+# Kategorisier-Teil, nur für den NATIVEN Anthropic-Anbieter nötig.
+# Bei Nutzung von OpenRouter (OPENROUTER_API_KEY) NICHT erforderlich -- der
+# OpenRouter-Kategorisierer kommt mit requests aus.
+anthropic>=0.40
+
+# Web-UI (lokale FastAPI-App):
+fastapi>=0.110
+uvicorn>=0.29
+
+# Entwicklung/Tests:
+pytest>=8.0
+httpx>=0.27   # für fastapi.testclient

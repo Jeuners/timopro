@@ -49,19 +49,63 @@ python -m angebote "Frankfurt"
 python -m angebote 60487 --no-llm
 ```
 
-Der Kategorisier-Schritt braucht `ANTHROPIC_API_KEY` in der Umgebung. Fehlt er
-und es wird kein `--no-llm` gesetzt, bricht das Programm ehrlich ab, statt
-ungeordnet weiterzulaufen.
+Der Kategorisier-Schritt braucht einen LLM-Zugang in der Umgebung --
+`OPENROUTER_API_KEY` (empfohlen, viele Modelle) **oder** `ANTHROPIC_API_KEY`.
+Fehlt beides und es wird kein `--no-llm` gesetzt, bricht das Programm ehrlich
+ab, statt ungeordnet weiterzulaufen. Modell überschreiben mit `--modell`,
+Anbieter erzwingen mit `--anbieter openrouter|anthropic`. Modelle auflisten:
+`python -m angebote --modelle [suchbegriff]`.
+
+## Web-UI
+
+Lokale FastAPI-App -- dünne Schicht über denselben Modulen, der Schnitt bleibt
+gewahrt. Sie macht den **zweistufigen Ablauf** sichtbar und erzwingt seine
+Reihenfolge:
+
+1. **Stufe 1 -- Rohdaten holen & speichern** (deterministisch, kein LLM, kein
+   Key): Abruf für eine PLZ, Persistenz pro PLZ/Woche unter `data/roh/`. Die
+   belegte Rohliste ist für sich ansehbar.
+2. **OpenRouter-Konfiguration** -- separates Panel (Key + Modellauswahl mit
+   Liste/Suche/Aktualisieren), gilt für Stufe 2.
+3. **Stufe 2 -- Kategorisieren** (LLM): läuft **nur auf den gespeicherten
+   Rohdaten** und ist gesperrt, solange keine vorliegen. Ergebnis ist die nach
+   Produktgruppen gruppierte Übersicht mit Filtern, Unsicherheits-Markierung
+   und belegter Quelle je Angebot.
+
+![Zweistufige UI: Rohdaten holen, OpenRouter-Konfig, Kategorisieren](docs/ui-stufen.png)
+
+Die gruppierte Ergebnisansicht nach Stufe 2:
+
+![Gruppierte Übersicht mit Preisen, Händlern, unsicher-Markierung](docs/ui-ergebnis.png)
+
+Starten:
+
+```bash
+pip install -r requirements.txt   # enthält fastapi + uvicorn
+cd src
+OPENROUTER_API_KEY=… PYTHONPATH=. uvicorn angebote.web:app --port 8077
+# Browser: http://127.0.0.1:8077/
+```
+
+Der Key kann auch im UI-Konfigpanel eingegeben werden (bleibt lokal). Die App
+ist als **Single-User-Werkzeug für localhost** gedacht -- nicht mit
+`--host 0.0.0.0` ins Netz stellen (keine Auth auf den Endpoints).
 
 ## Stand der Implementierung (ehrlich)
 
 - `requirements.txt` -- **vorhanden**.
 - `src/angebote/` -- **vorhanden**: Datenmodell, Adapter-Schnittstelle,
   Fetch-Orchestrator, Kategorisier-Schritt, Übersicht-Renderer, CLI.
-- `tests/` -- **vorhanden**: Architektur-Tests (kein Auffüllen, Abbruch bei
+- `tests/` -- **47 Tests**: Architektur-Regeln (kein Auffüllen, Abbruch bei
   leerem/unauflösbarem Ort, Daten-Integrität nach Kategorisierung,
   geschlossene Kategorienliste, Unsicherheits-Flag, Schnitt-Test "kein LLM im
-  Fetch-Teil"). Laufen offline, ohne Netz und ohne LLM.
+  Fetch-Teil"), Modell-Discovery/-Auswahl, Anbieter-/Retry-Logik, Rohdaten-
+  Persistenz und die Web-Endpoints. Laufen offline, ohne Netz und ohne LLM.
+- **Web-UI + zweistufiger Flow** -- vorhanden und live verifiziert: Stufe 1
+  (Fetch + Speichern) und Stufe 2 (LLM-Kategorisierung auf den gespeicherten
+  Rohdaten, gesperrt bis Daten da sind) end-to-end gegen PLZ 60487 getestet.
+  Kategorisierung modellstabil (gpt-oss-120b und gemini-3.1-flash-lite liefern
+  praktisch dieselbe Gruppenverteilung).
 - **Live bestätigt:** der marktguru-Adapter wurde gegen die echte API getestet
   (PLZ 60487) und liefert reale, belegte Angebote (u. a. ALDI SÜD, PENNY, Lidl,
   REWE, Kaufland, nahkauf). Erkenntnisse aus dem echten Lauf, die direkt in den
@@ -85,6 +129,7 @@ ungeordnet weiterzulaufen.
 CLAUDE.md                                  Leitfaden / Architektur
 README.md                                  dieses Dokument
 requirements.txt                           Abhängigkeiten
+docs/                                      Screenshots für dieses Dokument
 .claude/skills/angebote-fetch/             Spec: deterministischer Datenabruf
 .claude/skills/angebote-kategorisieren/    Spec: LLM-gestützte Einordnung
 src/angebote/                              Implementierung
@@ -95,8 +140,14 @@ src/angebote/                              Implementierung
     basis.py       Adapter-Schnittstelle + Ort
     marktguru.py   erster echter Adapter, geprüfter Ortsbezug
   fetch.py         Orchestrator (Ort rein, belegte Angebote raus)
-  kategorisieren.py LLM-Schritt hinter einer Schnittstelle (offline testbar)
-  uebersicht.py    Gruppierung + Rendering
+  speicher.py      Persistenz der belegten Rohdaten (Stufe 1), kein LLM
+  kategorisieren.py LLM-Schritt hinter Protokoll (OpenRouter/Anthropic), testbar
+  modelle.py       OpenRouter-Modell-Discovery (Liste/Suche/Top-Free)
+  modellauswahl.py interaktive Modellauswahl (CLI)
+  uebersicht.py    Gruppierung + Rendering (Markdown + JSON-Struktur)
+  web.py           FastAPI-Web-UI (Stufe-1-/Stufe-2-Endpoints)
+  web_static/      Frontend (index.html)
   cli.py / __main__.py  CLI-Einstieg
-tests/                                     Architektur-Tests
+tests/                                     47 Architektur-/Web-Tests
+data/roh/                                  generierte Rohdaten (ge-ignored)
 ```

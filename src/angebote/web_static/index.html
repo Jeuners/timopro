@@ -24,7 +24,7 @@
     --err:#8a231d; --err-bg:#fbeae8; --err-line:#e6b8b2;
     --price:#11221b;
     --line:#e3ded5; --line-2:#eceae2; --ctrl:#8a8474;
-    --focus:#0e5d42;
+    --focus:#0e5d42; color-scheme:light;
     --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s6:24px; --s8:32px; --s12:48px;
     --radius:16px; --radius-sm:11px; --radius-pill:999px;
     --appbar-h:60px;
@@ -34,8 +34,27 @@
     --shadow-lg:0 20px 50px -20px rgba(20,18,12,.30);
     --ring:0 0 0 3px var(--brand-weak), 0 0 0 1.5px var(--brand);
   }
+  /* Dunkel-Tokens — AAA-verifiziert. ACHTUNG: bewusst ZWEIMAL geführt, damit
+     beides geht: manueller Schalter ([data-theme=dark]) UND System-Automatik
+     (prefers-color-scheme, außer der Nutzer hat manuell „hell" gewählt).
+     Beide Blöcke MÜSSEN identische Werte haben. */
+  :root[data-theme="dark"] {
+    --bg:#13120d; --panel:#1d1b15; --panel-2:#23211a; --panel-3:#2a2820;
+    --ink:#f2efe7; --ink-2:#d6d2c6; --muted:#cbc6b7;
+    --brand:#3db188; --brand-text:#6cd2a4; --on-brand:#06130c;
+    --brand-weak:#18352a; --brand-weak-line:#2c5a47;
+    --warn:#f4cf86; --warn-bg:#3a2f12; --warn-line:#5c4a1e;
+    --err:#f0a59c; --err-bg:#3a1f1c; --err-line:#5e2e2a;
+    --price:#eaf7f0;
+    --line:#2e2c24; --line-2:#272519; --ctrl:#767161;
+    --focus:#6cd2a4; color-scheme:dark;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+    --shadow-md:0 12px 32px -14px rgba(0,0,0,.6);
+    --shadow-lg:0 24px 56px -22px rgba(0,0,0,.7);
+    --ring:0 0 0 3px rgba(108,210,164,.28), 0 0 0 1.5px var(--brand-text);
+  }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="light"]) {
       --bg:#13120d; --panel:#1d1b15; --panel-2:#23211a; --panel-3:#2a2820;
       --ink:#f2efe7; --ink-2:#d6d2c6; --muted:#cbc6b7;
       --brand:#3db188; --brand-text:#6cd2a4; --on-brand:#06130c;
@@ -44,7 +63,7 @@
       --err:#f0a59c; --err-bg:#3a1f1c; --err-line:#5e2e2a;
       --price:#eaf7f0;
       --line:#2e2c24; --line-2:#272519; --ctrl:#767161;
-      --focus:#6cd2a4;
+      --focus:#6cd2a4; color-scheme:dark;
       --shadow-sm:0 1px 2px rgba(0,0,0,.4);
       --shadow-md:0 12px 32px -14px rgba(0,0,0,.6);
       --shadow-lg:0 24px 56px -22px rgba(0,0,0,.7);
@@ -306,6 +325,21 @@
     border:1px solid var(--warn-line); border-radius:6px; padding:1px 8px; margin-left:8px; font-weight:700; }
   .leer { padding:var(--s4) var(--s6); color:var(--muted); font-style:italic; font-size:14px; }
 
+  /* Filter-Feedback: Treffer-Zähler, sanfte Einblendung, Leer-Zustand */
+  .filterstat { font-size:13.5px; color:var(--muted); margin-bottom:var(--s3); font-weight:600;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .filterstat b { color:var(--ink); font-weight:800; }
+  .linkbtn { background:none; border:none; color:var(--brand-text); font:inherit; font-weight:700;
+    cursor:pointer; padding:2px 4px; min-height:0; text-decoration:underline; border-radius:6px; }
+  .linkbtn:hover { background:var(--brand-weak); filter:none; transform:none; box-shadow:none; }
+  .linkbtn:focus-visible { box-shadow:var(--ring); }
+  @keyframes grp-in { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+  #gruppen.filtern > section.grp { animation:grp-in .2s ease both; }
+  .keine-treffer { padding:var(--s12) var(--s6); text-align:center; background:var(--panel);
+    border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow-sm); color:var(--muted); }
+  .keine-treffer .big { font-size:18px; font-weight:800; color:var(--ink); margin-bottom:6px; }
+  @media (prefers-reduced-motion: reduce) { #gruppen.filtern > section.grp { animation:none; } }
+
   /* Quelle: sichtbar lassen, nur schöner (kein Roh-String mehr) */
   .quelle { display:inline-flex; align-items:center; gap:4px; font-size:11.5px; color:var(--muted);
     background:var(--panel-3); border:1px solid var(--line); border-radius:6px; padding:1px 7px; font-weight:600; }
@@ -339,6 +373,12 @@
     .grp-h-btn { padding-left:var(--s4); padding-right:var(--s4); }
   }
 </style>
+<script>
+  /* Theme vor dem ersten Paint setzen — kein Aufblitzen des falschen Modus. */
+  try { var _t = localStorage.getItem("ang_theme");
+        if (_t === "dark" || _t === "light") document.documentElement.setAttribute("data-theme", _t); }
+  catch (e) {}
+</script>
 </head>
 <body>
 <a class="sr-only" href="#stage1">Zum Inhalt springen</a>
@@ -359,6 +399,7 @@
     </a>
     <span class="place leer" id="appbarPlz" aria-live="polite">PLZ …</span>
     <span class="spacer"></span>
+    <button class="iconbtn" id="themeToggle" type="button" title="Farbmodus" aria-label="Farbmodus umschalten"><span class="ti" aria-hidden="true">🌗</span></button>
     <button class="iconbtn" id="appbarSettings" type="button" title="LLM-Konfiguration" aria-label="LLM-Konfiguration öffnen">⚙</button>
   </div>
 </header>
@@ -475,6 +516,7 @@
         <div class="field"><label for="ftext">Angebot suchen</label><input id="ftext" type="text" placeholder="Titel…" /></div>
         <div class="field check"><input id="fsicher" type="checkbox" /><label for="fsicher">nur sichere</label></div>
       </div>
+      <div class="filterstat" id="filterstat" role="status" aria-live="polite" hidden></div>
       <nav id="gruppennav" class="gruppenband" aria-label="Produktgruppen — zum Abschnitt springen"></nav>
       <div id="korrektur-feedback" class="kfeedback" role="status" aria-live="polite"></div>
     </header>
@@ -761,17 +803,23 @@ function zeichneGruppen(){
   const fH = $("#fhaendler").value;
   const fT = $("#ftext").value.trim().toLowerCase();
   const nurSicher = $("#fsicher").checked;
+  const filterAktiv = !!(fH || fT || nurSicher);
   const box = $("#gruppen");
   box.innerHTML = "";
+  box.classList.toggle("filtern", filterAktiv);   // löst die Einblende-Animation aus (Feedback)
   const navDaten = [];
+  let treffer = 0;
 
   for (const g of d.gruppen){
     const items = g.angebote.filter(a => passt(a, fH, fT, nurSicher));
+    // Beim Filtern leere Gruppen GANZ ausblenden -> Treffer stehen sofort oben,
+    // man muss sie nicht zwischen leeren Boxen suchen. Ohne Filter: alle zeigen.
+    if (!items.length && filterAktiv) continue;
+
     const sec = document.createElement("section");
     sec.className = "grp";
     sec.dataset.grp = g.name;
-    const secId = "grp-" + g.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-    sec.id = secId;
+    sec.id = "grp-" + g.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
 
     const h = document.createElement("h3");
     h.className = "grp-h";
@@ -791,17 +839,71 @@ function zeichneGruppen(){
 
     if (!items.length){
       const p = document.createElement("div"); p.className = "leer";
-      p.textContent = (fH || fT || nurSicher) ? "keine Treffer im Filter" : "keine Angebote";
+      p.textContent = "keine Angebote";
       sec.appendChild(p);
     } else {
       const ul = document.createElement("ul");
       for (const a of items) ul.appendChild(zeile(a, g.name));
       sec.appendChild(ul);
       navDaten.push({ name:g.name, count:items.length, uns:items.filter(a=>a.unsicher).length });
+      treffer += items.length;
     }
     box.appendChild(sec);
   }
+
+  // 0 Treffer trotz aktivem Filter -> klarer Leer-Zustand statt leerer Seite
+  if (filterAktiv && !box.children.length){
+    box.innerHTML =
+      `<div class="keine-treffer"><div class="big">Keine Treffer</div>` +
+      `Kein Angebot passt zu diesem Filter. ` +
+      `<button type="button" class="linkbtn" id="filterReset">Filter zurücksetzen</button></div>`;
+    const rb = $("#filterReset"); if (rb) rb.onclick = filterZuruecksetzen;
+  }
+
+  // Sichtbares Filter-Feedback im Header (Treffer-Zähler + Reset)
+  const fs = $("#filterstat");
+  if (filterAktiv){
+    fs.hidden = false;
+    fs.innerHTML =
+      `🔎 <b>${treffer}</b> Treffer in <b>${navDaten.length}</b> Gruppe${navDaten.length===1?"":"n"}` +
+      ` <button type="button" class="linkbtn" id="filterReset2">Filter zurücksetzen</button>`;
+    const rb2 = $("#filterReset2"); if (rb2) rb2.onclick = filterZuruecksetzen;
+  } else {
+    fs.hidden = true; fs.innerHTML = "";
+  }
+
   baueGruppenband(navDaten);
+}
+
+function filterZuruecksetzen(){
+  $("#fhaendler").value = "";
+  $("#ftext").value = "";
+  $("#fsicher").checked = false;
+  zeichneGruppen();
+}
+
+// ----- Farbmodus: Auto -> Hell -> Dunkel (manueller Schalter) ----------------
+function gemerktesTheme(){ try { return localStorage.getItem("ang_theme") || "auto"; } catch(e){ return "auto"; } }
+function systemDunkel(){ return matchMedia("(prefers-color-scheme: dark)").matches; }
+function setzeTheme(t){
+  const root = document.documentElement;
+  if (t === "auto") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", t);
+  try { localStorage.setItem("ang_theme", t); } catch(e){}
+  const dunkelJetzt = t === "dark" || (t === "auto" && systemDunkel());
+  const ico = t === "auto" ? "🌗" : (t === "dark" ? "🌙" : "☀️");
+  const label = t === "auto" ? `Farbmodus: automatisch (${dunkelJetzt ? "dunkel" : "hell"})`
+              : t === "dark" ? "Farbmodus: dunkel" : "Farbmodus: hell";
+  const btn = $("#themeToggle");
+  if (btn){ btn.querySelector(".ti").textContent = ico; btn.setAttribute("aria-label", label + " — umschalten"); btn.title = label; }
+  // Adressleisten-Farbe (mobil) ans aktuelle Theme angleichen
+  let mc = document.querySelector('meta[name="theme-color"]:not([media])');
+  if (!mc){ mc = document.createElement("meta"); mc.setAttribute("name","theme-color"); document.head.appendChild(mc); }
+  mc.setAttribute("content", dunkelJetzt ? "#13120d" : "#0e5d42");
+}
+function zyklusTheme(){
+  const reihen = ["auto","light","dark"];
+  setzeTheme(reihen[(reihen.indexOf(gemerktesTheme()) + 1) % reihen.length]);
 }
 
 function baueGruppenband(navDaten){
@@ -922,6 +1024,11 @@ $("#appbarSettings").onclick = () => {
   c.scrollIntoView({behavior:"smooth", block:"center"});
   c.querySelector("summary").focus();
 };
+$("#themeToggle").onclick = zyklusTheme;
+// Im Auto-Modus dem System-Wechsel folgen (Icon/Adressleiste mitziehen)
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  if (gemerktesTheme() === "auto") setzeTheme("auto");
+});
 let _plzTimer;
 $("#plz").addEventListener("input", () => {
   setAppbarPlz();
@@ -934,6 +1041,7 @@ for (const id of ["#fhaendler","#ftext","#fsicher"])
 
 // ----- Init ------------------------------------------------------------------
 (async function init(){
+  setzeTheme(gemerktesTheme());   // Button-Icon/Label an gemerkten Modus angleichen
   const _p = new URLSearchParams(location.search);
   const ab = _p.get("anbieter") || gemerkterAnbieter();
   if (ab) $("#anbieter").value = ab;

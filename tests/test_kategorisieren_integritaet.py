@@ -35,6 +35,23 @@ def test_originaldaten_unveraendert_property():
         assert nachher is vorher
 
 
+def test_parallel_ordnet_alle_batches_vollstaendig_zu():
+    # 60 Angebote -> 3 Batches -> parallel verarbeitet; nichts darf verloren gehen.
+    angebote = [beispiel_angebot(f"Artikel {i}", preis=float(i)) for i in range(60)]
+    fake = FakeKategorisierer(
+        lambda posten: [
+            {"id": p["id"], "gruppe": "Sonstiges", "unsicher": False} for p in posten
+        ]
+    )
+    ergebnis = kategorisiere(angebote, fake, batch_groesse=25, parallel=4)
+    assert len(ergebnis) == 60
+    assert all(k.gruppe == "Sonstiges" and not k.unsicher for k in ergebnis)
+    # jedes Original-Angebot bleibt unverändert erhalten (id-basiert gemappt)
+    ids_in = {a.angebot_id for a in angebote}
+    ids_out = {k.angebot.angebot_id for k in ergebnis}
+    assert ids_in == ids_out
+
+
 def test_fehlender_preis_bleibt_fehlend():
     angebot = beispiel_angebot("Hähnchen", preis=None)
     ergebnis = kategorisiere([angebot], _gib_gruppe("Fleisch & Wurst"))

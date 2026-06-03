@@ -39,40 +39,62 @@ def kategorisiere(
     *,
     batch_groesse: int = 25,
     fortschritt=None,
+    parallel: int = 8,
 ) -> list[KategorisiertesAngebot]:
     """Ordnet jedes Angebot einer Produktgruppe zu, ohne Daten zu verändern.
 
     `fortschritt`: optionaler Callback (erledigte_batches, gesamt_batches) --
-    für Live-Anzeigen (z. B. die Web-UI). Ändert die Logik nicht.
+    für Live-Anzeigen (z. B. die Web-UI).
+    `parallel`: bis zu so viele Batches gleichzeitig (LLM-Calls sind I/O-bound).
+    Ändert die Logik nicht -- nur die Ausführungs-Reihenfolge. Die Zuordnung
+    erfolgt id-basiert, ist also reihenfolge-unabhängig.
     """
+    import threading
+
     original = {a.angebot_id: a for a in angebote}
     ergebnis: dict[str, KategorisiertesAngebot] = {}
+    lock = threading.Lock()
 
-    import math
+    batches = [
+        angebote[start : start + batch_groesse]
+        for start in range(0, len(angebote), batch_groesse)
+    ]
+    gesamt_batches = max(1, len(batches))
+    erledigt = [0]
 
-    gesamt_batches = max(1, math.ceil(len(angebote) / batch_groesse))
-    for nr, start in enumerate(range(0, len(angebote), batch_groesse), 1):
-        batch = angebote[start : start + batch_groesse]
+    def verarbeite(batch):
         posten = [
-            {
-                "id": a.angebot_id,
-                "titel": a.titel,
-                "marke": a.marke,
-                "menge": a.menge,
-            }
+            {"id": a.angebot_id, "titel": a.titel, "marke": a.marke, "menge": a.menge}
             for a in batch
         ]
-        antworten = kategorisierer.klassifiziere(posten)
-        for ant in antworten:
-            aid = ant.get("id")
-            if aid not in original or aid in ergebnis:
-                continue  # fremde/duplizierte ID ignorieren
-            gruppe, unsicher = _bereinige_gruppe(ant.get("gruppe"), ant.get("unsicher"))
-            ergebnis[aid] = KategorisiertesAngebot(
-                angebot=original[aid], gruppe=gruppe, unsicher=unsicher
-            )
-        if fortschritt is not None:
-            fortschritt(nr, gesamt_batches)
+        return kategorisierer.klassifiziere(posten)
+
+    def uebernehmen(antworten):
+        with lock:
+            for ant in antworten:
+                aid = ant.get("id")
+                if aid not in original or aid in ergebnis:
+                    continue  # fremde/duplizierte ID ignorieren
+                gruppe, unsicher = _bereinige_gruppe(
+                    ant.get("gruppe"), ant.get("unsicher")
+                )
+                ergebnis[aid] = KategorisiertesAngebot(
+                    angebot=original[aid], gruppe=gruppe, unsicher=unsicher
+                )
+            erledigt[0] += 1
+            if fortschritt is not None:
+                fortschritt(erledigt[0], gesamt_batches)
+
+    if parallel > 1 and len(batches) > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        with ThreadPoolExecutor(max_workers=parallel) as ex:
+            futures = [ex.submit(verarbeite, b) for b in batches]
+            for fut in as_completed(futures):
+                uebernehmen(fut.result())  # AbbruchFehler propagiert bewusst
+    else:
+        for batch in batches:
+            uebernehmen(verarbeite(batch))
 
     # Posten, die das Modell nicht (gültig) beantwortet hat: ehrlich als
     # unsicher mit Fallback markieren -- nicht still einsortieren.

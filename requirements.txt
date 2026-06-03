@@ -12,4 +12,5 @@ uvicorn>=0.29
 
 # Entwicklung/Tests:
 pytest>=8.0
-httpx>=0.27   # für fastapi.testclient
+httpx>=0.27            # für fastapi.testclient
+pytest-playwright>=0.5  # E2E-UI-Tests (danach: `playwright install chromium`)

@@ -335,14 +335,27 @@ function setStatus(html){ $("#status").innerHTML = html; }
 // ----- Modelle (LLM-Konfig: OpenRouter ODER Ollama) -------------------------
 function anbieter(){ return $("#anbieter").value; }
 
+// Auswahl in localStorage merken/laden, damit Anbieter + Modell einen Reload
+// überleben (statt auf den Default zurückzuspringen).
+function merkeWahl(){
+  try {
+    localStorage.setItem("ang_anbieter", anbieter());
+    const m = $("#modell").value;
+    if (m) localStorage.setItem("ang_modell_" + anbieter(), m);
+  } catch(e){}
+}
+function gemerkterAnbieter(){ try { return localStorage.getItem("ang_anbieter"); } catch(e){ return null; } }
+function gemerktesModell(ab){ try { return localStorage.getItem("ang_modell_" + ab); } catch(e){ return null; } }
+
 // Hält das dauerhaft sichtbare "gewähltes Modell"-Chip im Konfig-Kopf aktuell --
-// auch wenn das Panel zugeklappt ist.
+// auch wenn das Panel zugeklappt ist -- und merkt die Wahl.
 function setGewaehlt(){
   const sel = $("#modell");
   const opt = sel.options[sel.selectedIndex];
   const m = (sel.value && opt && !opt.disabled) ? sel.value : null;
   const ab = anbieter() === "ollama" ? "Ollama (lokal)" : "OpenRouter";
   $("#gewaehltChip").textContent = m ? `${m} · ${ab}` : `kein Modell · ${ab}`;
+  merkeWahl();
 }
 
 async function ladeModelle(q=""){
@@ -351,8 +364,8 @@ async function ladeModelle(q=""){
   // Anbieter-spezifische UI: Ollama braucht weder Key noch Suche.
   $("#keyzeile").style.display = ab === "ollama" ? "none" : "";
   $("#suchfeld").style.display = ab === "ollama" ? "none" : "";
-  $("#konfighint").textContent = ab === "ollama"
-    ? "Lokale Modelle über Ollama (localhost:11434) — kein Key, kein Netz. Nur tool-fähige Modelle eignen sich."
+  $("#konfighint").innerHTML = ab === "ollama"
+    ? "Lokale Modelle über Ollama (localhost:11434) — kein Key, kein Netz. <b>Achtung:</b> kleine Modelle (3–9 B) liefern für diese Batch-Aufgabe oft kein zuverlässiges Tool-Calling — dann wird ehrlich alles als „Sonstiges/unsicher“ markiert statt geraten. Für brauchbare Ergebnisse ein starkes tool-Modell oder OpenRouter nutzen."
     : "Der Key wird ausschließlich für Stufe 2 verwendet und nie in Stufe 1 (Datenabruf) eingesetzt.";
   const url = ab === "ollama" ? "/api/ollama-modelle" : ("/api/modelle?q=" + encodeURIComponent(q));
   sel.innerHTML = "<option>lädt…</option>";
@@ -376,8 +389,15 @@ async function ladeModelle(q=""){
       if (!m.tools) o.disabled = true;
       sel.appendChild(o);
     }
-    const ok = [...sel.options].find(o => !o.disabled && o.value);
-    if (ok) sel.value = ok.value;   // erstes brauchbares (tool-fähiges) vorwählen
+    // gemerktes Modell für diesen Anbieter bevorzugen, sonst erstes brauchbares
+    const opts = [...sel.options];
+    const gemerkt = gemerktesModell(ab);
+    if (gemerkt && opts.some(o => o.value === gemerkt && !o.disabled)){
+      sel.value = gemerkt;
+    } else {
+      const ok = opts.find(o => !o.disabled && o.value);
+      if (ok) sel.value = ok.value;
+    }
     setGewaehlt();
   } catch (e){
     sel.innerHTML = `<option value=''>Modelle nicht abrufbar</option>`;
@@ -610,7 +630,9 @@ for (const id of ["#fhaendler","#ftext","#fsicher"])
 // Bookmarkbar: ?plz=… [&anbieter=…] [&modell=…] [&auto=1]
 (async function init(){
   const _p = new URLSearchParams(location.search);
-  if (_p.get("anbieter")) $("#anbieter").value = _p.get("anbieter");
+  // Anbieter: URL-Param hat Vorrang, sonst die gemerkte Wahl, sonst Default.
+  const ab = _p.get("anbieter") || gemerkterAnbieter();
+  if (ab) $("#anbieter").value = ab;
   await ladeModelle();
   const m = _p.get("modell");
   if (m){

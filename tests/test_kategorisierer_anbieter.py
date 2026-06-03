@@ -166,3 +166,38 @@ def test_ollama_kategorisierer_parst_tool_calls_lokal():
     # OpenAI-kompatibel an den lokalen Endpoint adressiert:
     assert sess.calls[0]["url"].endswith("/chat/completions")
     assert "localhost:11434" in sess.calls[0]["url"]
+
+
+def test_content_fallback_extrahiert_zuordnungen():
+    from angebote.kategorisieren import _zuordnungen_aus_content
+
+    # Manche (lokale) Modelle verpacken die Tool-Antwort als content-JSON.
+    c = (
+        '```json\n{"name":"zuordnungen","arguments":{"zuordnungen":'
+        '[{"id":"x","gruppe":"Obst & Gemüse","unsicher":false}]}}\n```'
+    )
+    z = _zuordnungen_aus_content(c)
+    assert z == [{"id": "x", "gruppe": "Obst & Gemüse", "unsicher": False}]
+
+
+def test_content_fallback_ohne_json_gibt_none():
+    from angebote.kategorisieren import _zuordnungen_aus_content
+
+    assert _zuordnungen_aus_content("nur Text, kein JSON") is None
+    assert _zuordnungen_aus_content(None) is None
+
+
+def test_kategorisierer_nutzt_content_fallback_ohne_tool_calls():
+    # Antwort OHNE tool_calls, aber mit content-JSON -> Fallback greift.
+    from angebote.kategorisieren import OllamaKategorisierer
+
+    a = beispiel_angebot("Apfel")
+    inhalt = (
+        '{"zuordnungen":[{"id":"' + a.angebot_id
+        + '","gruppe":"Obst & Gemüse","unsicher":false}]}'
+    )
+    payload = {"choices": [{"message": {"content": inhalt}}]}
+    sess = _FakeSession(payload)
+    kt = OllamaKategorisierer(modell="x", session=sess)
+    ergebnis = kategorisiere([a], kt)
+    assert ergebnis[0].gruppe == "Obst & Gemüse"

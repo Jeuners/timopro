@@ -48,16 +48,33 @@ def index() -> str:
 
 @app.get("/api/modelle")
 def api_modelle(q: str = "") -> list[dict]:
-    """Modell-Liste für das Dropdown: Suche oder Top-Free. 'Aktualisieren' = neu rufen."""
+    """Modell-Liste fürs Dropdown. Ohne Suche: das EMPFOHLENE Default-Modell
+    (günstig, nicht gedrosselt) zuerst, dann die Top-Free.
+
+    Hintergrund: Free-Modelle sind bei OpenRouter hart gedrosselt (429). Würde
+    die UI eines davon vorwählen, läuft der erste Lauf ins Rate-Limit. Deshalb
+    steht der Default (deepseek-v4-flash) vorne und wird vorgewählt.
+    """
+    from .kategorisieren import _DEFAULT_MODELLE
     from .modelle import lade_modelle, suche, top_free
 
     try:
         alle = lade_modelle()
     except Exception as e:  # Netz/SSL -> ehrlich melden, nicht raten
         raise HTTPException(status_code=502, detail=f"Modelle nicht abrufbar: {e}")
-    treffer = suche(alle, q) if q else top_free(alle, 8)
+
+    default_id = _DEFAULT_MODELLE.get("openrouter")
+    if q:
+        treffer = suche(alle, q)
+    else:
+        default_mi = next((m for m in alle if m.id == default_id), None)
+        top = [m for m in top_free(alle, 8) if m.id != default_id]
+        treffer = ([default_mi] if default_mi else []) + top
     return [
-        {"id": m.id, "frei": m.frei, "tools": m.tools, "context": m.context}
+        {
+            "id": m.id, "frei": m.frei, "tools": m.tools, "context": m.context,
+            "empfohlen": m.id == default_id,
+        }
         for m in treffer[:25]
     ]
 
@@ -223,10 +240,17 @@ def _run_kategorisieren(job_id, plz, fetch, modell, anbieter, key) -> None:
         # Tatsächlich genutztes Modell (Default je Anbieter aufgelöst) -- für die
         # sichtbare Herkunft im Ergebnis.
         modell_genutzt = getattr(kt, "_modell", modell)
+        print(
+            f"[Stufe 2] start · PLZ {plz} · {anbieter}/{modell_genutzt} · "
+            f"{len(fetch.angebote)} Angebote",
+            flush=True,
+        )
 
         def fort(done, total):
             job["done"] = done
             job["total"] = total
+            if done == total or done % 5 == 0:  # nicht jede Batch -> Log lesbar
+                print(f"[Stufe 2] PLZ {plz} · Batch {done}/{total}", flush=True)
 
         kat = kategorisiere(list(fetch.angebote), kt, fortschritt=fort)
 
@@ -235,9 +259,14 @@ def _run_kategorisieren(job_id, plz, fetch, modell, anbieter, key) -> None:
         )
         job["status"] = "fertig"
         _ergebnis_cache[(plz, anbieter, modell)] = job["ergebnis"]
+        print(
+            f"[Stufe 2] fertig · PLZ {plz} · {job['ergebnis']['unsicher']} unsicher",
+            flush=True,
+        )
     except AbbruchFehler as e:
         job["status"] = "fehler"
         job["fehler"] = e.als_text()
+        print(f"[Stufe 2] ABBRUCH · PLZ {plz} · {e.schwelle}: {e.ursache}", flush=True)
     except Exception as e:  # nichts verstecken -- ehrliche Fehlermeldung
         job["status"] = "fehler"
         job["fehler"] = f"Unerwarteter Fehler: {e}"

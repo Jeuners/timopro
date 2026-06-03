@@ -383,17 +383,27 @@ async function ladeModelle(q=""){
     for (const m of liste){
       const o = document.createElement("option");
       o.value = m.id;
-      const tag = ab === "ollama" ? "lokal" : (m.frei ? "FREE" : "paid");
+      o.dataset.frei = m.frei ? "1" : "0";
+      o.dataset.empf = m.empfohlen ? "1" : "0";
+      let tag;
+      if (ab === "ollama") tag = "lokal";
+      else if (m.empfohlen) tag = "★ empfohlen";
+      else tag = m.frei ? "FREE · oft gedrosselt" : "paid";
       const tools = m.tools ? "" : " ⚠ kein tool-calling";
       o.textContent = `${m.id}  [${tag}]${tools}`;
       if (!m.tools) o.disabled = true;
       sel.appendChild(o);
     }
-    // gemerktes Modell für diesen Anbieter bevorzugen, sonst erstes brauchbares
+    // Vorauswahl: gemerktes Modell -- aber bei OpenRouter NICHT automatisch ein
+    // gedrosseltes Free-Modell (führt zu 429); dann lieber das empfohlene.
     const opts = [...sel.options];
     const gemerkt = gemerktesModell(ab);
-    if (gemerkt && opts.some(o => o.value === gemerkt && !o.disabled)){
-      sel.value = gemerkt;
+    const gemerktOpt = gemerkt ? opts.find(o => o.value === gemerkt && !o.disabled) : null;
+    const empfOpt = opts.find(o => o.dataset.empf === "1" && !o.disabled);
+    if (gemerktOpt && !(ab !== "ollama" && gemerktOpt.dataset.frei === "1")){
+      sel.value = gemerktOpt.value;
+    } else if (empfOpt){
+      sel.value = empfOpt.value;
     } else {
       const ok = opts.find(o => !o.disabled && o.value);
       if (ok) sel.value = ok.value;

@@ -44,16 +44,24 @@ def _angebot_dict(ka: KategorisiertesAngebot) -> dict:
 def als_struktur(
     fetch: FetchErgebnis,
     kategorisiert: list[KategorisiertesAngebot],
+    *,
+    modell: str | None = None,
+    anbieter: str | None = None,
 ) -> dict:
     """Strukturierte Ausgabe für die Web-UI -- dieselben belegten Felder wie der
     Markdown-Renderer, nur als JSON-fähiges dict. Leere Gruppen bleiben enthalten
-    (als leere Liste) -- kein Weglassen, kein Auffüllen."""
+    (als leere Liste) -- kein Weglassen, kein Auffüllen.
+
+    `modell`/`anbieter` belegen, WOMIT kategorisiert wurde -- damit in der UI
+    nachvollziehbar bleibt, welches LLM die Einordnung vorgenommen hat."""
     gruppen = gruppieren(kategorisiert)
     return {
         "ort_plz": fetch.ort_plz,
         "ort_name": fetch.ort_name,
         "anzahl": len(kategorisiert),
         "unsicher": sum(1 for k in kategorisiert if k.unsicher),
+        "modell": modell,
+        "anbieter": anbieter,
         "quellen": list(fetch.abgedeckte_quellen),
         "haendler": list(fetch.gesehene_haendler),
         "hinweise": list(fetch.hinweise),

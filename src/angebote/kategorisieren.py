@@ -140,6 +140,45 @@ def _user_text(posten: list[dict]) -> str:
     )
 
 
+def _finde_zuordnungen(obj):
+    """Sucht rekursiv ein 'zuordnungen'-Array in einem geparsten JSON-Objekt."""
+    if isinstance(obj, dict):
+        if isinstance(obj.get("zuordnungen"), list):
+            return obj["zuordnungen"]
+        for v in obj.values():
+            treffer = _finde_zuordnungen(v)
+            if treffer:
+                return treffer
+    elif isinstance(obj, list):
+        for v in obj:
+            treffer = _finde_zuordnungen(v)
+            if treffer:
+                return treffer
+    return None
+
+
+def _zuordnungen_aus_content(content) -> list | None:
+    """Extrahiert ein 'zuordnungen'-Array aus einem content-String (Fallback).
+
+    Manche lokale Modelle verpacken die Tool-Antwort als (ggf. in ```json
+    eingefasstes) JSON im Text statt als echte tool_calls. Wir lesen das defensiv
+    aus -- finden wir nichts Verwertbares, geben wir None zurück (kein Raten).
+    """
+    if not isinstance(content, str) or "{" not in content:
+        return None
+    import re
+
+    for roh in re.findall(r"\{.*\}", content, re.DOTALL):
+        try:
+            obj = json.loads(roh)
+        except json.JSONDecodeError:
+            continue
+        treffer = _finde_zuordnungen(obj)
+        if treffer:
+            return treffer
+    return None
+
+
 def _wartezeit(antwort, versuch: int, basis: float) -> float:
     """Backoff: Retry-After respektieren, sonst exponentiell ab max(basis, 2s)."""
     try:
@@ -319,23 +358,58 @@ class OpenRouterKategorisierer:
                 vorschlag="Key/Modell/Guthaben prüfen oder --no-llm verwenden",
             )
         try:
-            aufrufe = daten["choices"][0]["message"]["tool_calls"]
-            args = json.loads(aufrufe[0]["function"]["arguments"])
-            return list(args.get("zuordnungen", []))
-        except (KeyError, IndexError, TypeError, json.JSONDecodeError):
-            # Modell hat das Tool nicht (sauber) aufgerufen -> leer; die
-            # kategorisiere()-Logik markiert die Posten dann als unsicher.
+            nachricht = daten["choices"][0]["message"]
+        except (KeyError, IndexError, TypeError):
             return []
+        # 1) Sauberer Tool-Call (OpenRouter / gute Modelle).
+        try:
+            args = json.loads(nachricht["tool_calls"][0]["function"]["arguments"])
+            z = args.get("zuordnungen")
+            if z is not None:
+                return list(z)
+        except (KeyError, IndexError, TypeError, json.JSONDecodeError):
+            pass
+        # 2) Fallback: manche (lokale Ollama-) Modelle schreiben die Tool-Antwort
+        #    als content-JSON statt als tool_calls. Defensiv auslesen, nicht raten.
+        z = _zuordnungen_aus_content(nachricht.get("content"))
+        return z if z else []
+
+
+class OllamaKategorisierer(OpenRouterKategorisierer):
+    """Lokaler LLM über Ollama (OpenAI-kompatibler Endpoint /v1/chat/completions).
+
+    Erbt die komplette Tool-Calling-Logik vom OpenRouter-Kategorisierer -- Ollama
+    spricht dasselbe OpenAI-Schema. Kein Key (der Dummy-Bearer wird ignoriert),
+    kein Netz, keine Drosselung. Nur tool-fähige lokale Modelle (z. B. qwen3.5,
+    qwen2.5-coder, gemma4) eignen sich; andere liefern keine sauberen tool_calls.
+    """
+
+    def __init__(
+        self,
+        *,
+        modell: str,
+        base_url: str = "http://localhost:11434/v1",
+        session=None,
+    ) -> None:
+        super().__init__(
+            api_key="ollama",  # Dummy -- der lokale Server ignoriert den Bearer.
+            modell=modell,
+            base_url=base_url,
+            session=session,
+            mindest_abstand_s=0.0,  # lokal: keine Rate-Limits
+        )
 
 
 # Default je Anbieter. Für OpenRouter ein günstiges, aber verlässliches paid-
 # Modell: deepseek-v4-flash macht sauberes Tool-Calling, ist über mehrere
 # Batches konsistent und kostet nur ~1-2 Cent pro vollem Lauf (1903 Angebote).
-# Free-Modelle sind bei OpenRouter oft hart gedrosselt; mit `--modell` (CLI) bzw.
-# der Modellauswahl in der Web-UI lässt sich jederzeit ein anderes wählen.
+# Free-Modelle sind bei OpenRouter oft hart gedrosselt. Für Ollama ein gängiges
+# tool-fähiges lokales Modell als Fallback. Mit `--modell` (CLI) bzw. der
+# Modellauswahl in der Web-UI lässt sich jederzeit ein anderes wählen.
 _DEFAULT_MODELLE = {
     "anthropic": "claude-sonnet-4-6",
     "openrouter": "deepseek/deepseek-v4-flash",
+    "ollama": "qwen3.5:latest",
 }
 
 
@@ -350,6 +424,8 @@ def baue_kategorisierer(
     modell = modell or _DEFAULT_MODELLE.get(anbieter)
     if anbieter == "openrouter":
         return OpenRouterKategorisierer(modell=modell, api_key=api_key)
+    if anbieter == "ollama":
+        return OllamaKategorisierer(modell=modell)
     if anbieter == "anthropic":
         return AnthropicKategorisierer(modell=modell)
     raise AbbruchFehler(

@@ -134,3 +134,48 @@ def test_picker_quit_gibt_none():
         ausgabe=lambda s: None,
     )
     assert gewaehlt is None
+
+
+# --- Ollama (lokale Modelle) -------------------------------------------------
+
+
+class _OllamaSession:
+    """Fake für /api/tags (Liste) + /api/show (Capabilities)."""
+
+    def __init__(self, namen, caps):
+        self._namen = namen
+        self._caps = caps
+
+    def get(self, url, timeout=None):
+        return _Resp({"models": [{"name": n} for n in self._namen]})
+
+    def post(self, url, json=None, timeout=None):
+        name = (json or {}).get("model")
+        return _Resp({"capabilities": self._caps.get(name, [])})
+
+
+def test_lade_ollama_modelle_tool_faehige_zuerst():
+    from angebote.modelle import lade_ollama_modelle
+
+    sess = _OllamaSession(
+        ["gemma3:latest", "qwen3.5:latest", "nomic-embed:latest"],
+        {
+            "qwen3.5:latest": ["completion", "tools"],
+            "gemma3:latest": ["completion", "vision"],
+            "nomic-embed:latest": ["embedding"],
+        },
+    )
+    modelle = lade_ollama_modelle(session=sess)
+    assert all(m.frei for m in modelle)  # lokal = frei
+    assert modelle[0].id == "qwen3.5:latest" and modelle[0].tools is True
+    assert any(m.id == "gemma3:latest" and not m.tools for m in modelle)
+
+
+def test_lade_ollama_modelle_leer_wenn_server_aus():
+    from angebote.modelle import lade_ollama_modelle
+
+    class _Down:
+        def get(self, *a, **k):
+            raise OSError("connection refused")
+
+    assert lade_ollama_modelle(session=_Down()) == []

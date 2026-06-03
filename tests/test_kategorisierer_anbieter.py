@@ -142,3 +142,27 @@ def test_openrouter_429_erschoepft_bricht_als_ratelimit_ab():
         kat.klassifiziere([{"id": "x", "titel": "Apfel"}])
     assert "Rate-Limit" in exc.value.schwelle
     assert seq.calls == 3
+
+
+def test_baue_kategorisierer_ollama_ohne_key():
+    from angebote.kategorisieren import OllamaKategorisierer, baue_kategorisierer
+
+    # Ollama braucht KEINEN Key -- darf also nicht abbrechen.
+    kt = baue_kategorisierer("ollama", "qwen3.5:latest")
+    assert isinstance(kt, OllamaKategorisierer)
+
+
+def test_ollama_kategorisierer_parst_tool_calls_lokal():
+    from angebote.kategorisieren import OllamaKategorisierer
+
+    a = beispiel_angebot("Apfel")
+    payload = _openrouter_payload(
+        [{"id": a.angebot_id, "gruppe": "Obst & Gemüse", "unsicher": False}]
+    )
+    sess = _FakeSession(payload)
+    kt = OllamaKategorisierer(modell="qwen3.5:latest", session=sess)
+    ergebnis = kategorisiere([a], kt)
+    assert ergebnis[0].gruppe == "Obst & Gemüse"
+    # OpenAI-kompatibel an den lokalen Endpoint adressiert:
+    assert sess.calls[0]["url"].endswith("/chat/completions")
+    assert "localhost:11434" in sess.calls[0]["url"]

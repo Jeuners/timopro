@@ -62,6 +62,17 @@ def api_modelle(q: str = "") -> list[dict]:
     ]
 
 
+@app.get("/api/ollama-modelle")
+def api_ollama_modelle() -> list[dict]:
+    """Lokal installierte Ollama-Modelle. Leere Liste, wenn Ollama nicht läuft."""
+    from .modelle import lade_ollama_modelle
+
+    return [
+        {"id": m.id, "frei": m.frei, "tools": m.tools, "context": m.context}
+        for m in lade_ollama_modelle()
+    ]
+
+
 # === Stufe 1: Rohdaten holen & speichern (deterministisch, ohne Key) =========
 
 
@@ -160,7 +171,9 @@ def api_kategorisieren(req: dict) -> dict:
     job_id = uuid.uuid4().hex[:12]
 
     # Cache-Treffer? Dann sofort als fertiger Job ausliefern, kein neuer Lauf.
-    treffer = _ergebnis_cache.get((plz, modell))
+    # Anbieter ist Teil des Schlüssels -- dasselbe Modell-Kürzel kann je Anbieter
+    # etwas anderes bedeuten.
+    treffer = _ergebnis_cache.get((plz, anbieter, modell))
     if treffer is not None:
         with _jobs_lock:
             _jobs[job_id] = {
@@ -207,6 +220,9 @@ def _run_kategorisieren(job_id, plz, fetch, modell, anbieter, key) -> None:
         from .uebersicht import als_struktur
 
         kt = baue_kategorisierer(anbieter, modell, api_key=key)
+        # Tatsächlich genutztes Modell (Default je Anbieter aufgelöst) -- für die
+        # sichtbare Herkunft im Ergebnis.
+        modell_genutzt = getattr(kt, "_modell", modell)
 
         def fort(done, total):
             job["done"] = done
@@ -214,9 +230,11 @@ def _run_kategorisieren(job_id, plz, fetch, modell, anbieter, key) -> None:
 
         kat = kategorisiere(list(fetch.angebote), kt, fortschritt=fort)
 
-        job["ergebnis"] = als_struktur(fetch, kat)
+        job["ergebnis"] = als_struktur(
+            fetch, kat, modell=modell_genutzt, anbieter=anbieter
+        )
         job["status"] = "fertig"
-        _ergebnis_cache[(plz, modell)] = job["ergebnis"]
+        _ergebnis_cache[(plz, anbieter, modell)] = job["ergebnis"]
     except AbbruchFehler as e:
         job["status"] = "fehler"
         job["fehler"] = e.als_text()

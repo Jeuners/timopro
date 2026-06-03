@@ -75,6 +75,26 @@ def test_api_status_unbekannt_ist_404():
     assert r.status_code == 404
 
 
+def test_als_struktur_fuehrt_modell_und_anbieter():
+    a = beispiel_angebot("Butter")
+    kat = [KategorisiertesAngebot(a, "Molkereiprodukte & Eier", unsicher=False)]
+    s = als_struktur(_fetch_mit([a]), kat, modell="qwen3.5:latest", anbieter="ollama")
+    assert s["modell"] == "qwen3.5:latest"
+    assert s["anbieter"] == "ollama"
+
+
+def test_api_ollama_modelle(monkeypatch):
+    fake = [ModellInfo("qwen3.5:latest", "qwen3.5:latest", None, True, True)]
+    monkeypatch.setattr(
+        "angebote.modelle.lade_ollama_modelle", lambda session=None: fake
+    )
+    client = TestClient(web.app)
+    r = client.get("/api/ollama-modelle")
+    assert r.status_code == 200
+    daten = r.json()
+    assert daten[0]["id"] == "qwen3.5:latest" and daten[0]["tools"] is True
+
+
 # === Stufe 1: Rohdaten holen & speichern (deterministisch, ohne Key) =========
 
 

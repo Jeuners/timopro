@@ -113,3 +113,55 @@ def suche(
     if nur_tools:
         res = [m for m in res if m.tools]
     return sorted(res, key=_rang)
+
+
+# --- Ollama (lokale LLMs) ----------------------------------------------------
+
+OLLAMA_BASIS = "http://localhost:11434"
+
+
+def _ollama_kann_tools(sess, name: str) -> bool:
+    """Liest die Capabilities eines lokalen Modells (/api/show) -- 'tools'?"""
+    try:
+        r = sess.post(OLLAMA_BASIS + "/api/show", json={"model": name}, timeout=8)
+        r.raise_for_status()
+        return "tools" in (r.json().get("capabilities") or [])
+    except Exception:
+        return False  # nicht belegbar -> konservativ als nicht tool-fähig
+
+
+def lade_ollama_modelle(session=None) -> list[ModellInfo]:
+    """Lokal installierte Ollama-Modelle (/api/tags), mit Tool-Fähigkeit.
+
+    `frei=True` (lokal = ohne Kosten). `tools` aus /api/show -- nur tool-fähige
+    Modelle taugen für die Kategorisierung. Läuft Ollama nicht, kommt eine LEERE
+    Liste zurück (kein Fehler -- der Anbieter ist optional), nicht geraten.
+    """
+    sess = session
+    if sess is None:
+        import requests
+
+        sess = requests
+    try:
+        r = sess.get(OLLAMA_BASIS + "/api/tags", timeout=5)
+        r.raise_for_status()
+        eintraege = r.json().get("models", [])
+    except Exception:
+        return []
+
+    out: list[ModellInfo] = []
+    for m in eintraege:
+        name = m.get("name") or m.get("model") or ""
+        if not name:
+            continue
+        out.append(
+            ModellInfo(
+                id=name,
+                name=name,
+                context=None,
+                frei=True,
+                tools=_ollama_kann_tools(sess, name),
+            )
+        )
+    # tool-fähige zuerst, dann alphabetisch -- die brauchbaren oben.
+    return sorted(out, key=lambda mi: (not mi.tools, mi.id))

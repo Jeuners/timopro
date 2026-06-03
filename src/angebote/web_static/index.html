@@ -140,7 +140,12 @@
   .config > summary .chev { transition:transform .2s; color:var(--muted); }
   .config[open] > summary .chev { transform:rotate(90deg); }
   .config > summary .ico { font-size:14px; }
-  .config > summary .gilt { margin-left:auto; font-weight:500; font-size:12px; color:var(--muted); }
+  .config > summary .gewaehlt-chip {
+    margin-left:auto; font-size:12px; font-weight:600; color:var(--brand-d);
+    background:var(--brand-weak); border:1px solid #cfe3d9; border-radius:999px;
+    padding:2px 11px; max-width:46ch; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .config > summary .gilt { margin-left:var(--s3); font-weight:500; font-size:12px; color:var(--muted); }
   .config-body { padding:0 var(--s6) var(--s6); border-top:1px solid var(--line-2); padding-top:var(--s4); }
   .keyrow { width:100%; max-width:560px; }
   .keyrow input { width:100%; }
@@ -239,21 +244,29 @@
       </div>
     </section>
 
-    <!-- ============ OPENROUTER-KONFIG (separat) ============ -->
+    <!-- ============ LLM-KONFIG (separat) ============ -->
     <details class="config" id="config">
       <summary>
         <span class="chev">▸</span>
         <span class="ico">⚙</span>
-        <span>OpenRouter-Konfiguration</span>
+        <span>LLM-Konfiguration</span>
+        <span class="gewaehlt-chip" id="gewaehltChip" title="aktuell gewähltes Modell">—</span>
         <span class="gilt">gilt für Stufe&nbsp;2</span>
       </summary>
       <div class="config-body">
         <div class="row">
           <div class="field">
+            <label for="anbieter">Anbieter</label>
+            <select id="anbieter">
+              <option value="openrouter">OpenRouter (Cloud)</option>
+              <option value="ollama">Ollama (lokal)</option>
+            </select>
+          </div>
+          <div class="field">
             <label for="modell">Modell</label>
             <select id="modell"><option>lädt…</option></select>
           </div>
-          <div class="field">
+          <div class="field" id="suchfeld">
             <label for="modellsuche">Modell suchen</label>
             <input id="modellsuche" type="text" placeholder="z. B. qwen" />
           </div>
@@ -262,13 +275,13 @@
             <button id="refresh" class="ghost icon" title="Modell-Liste aktualisieren">↻ aktualisieren</button>
           </div>
         </div>
-        <div class="row" style="margin-top:var(--s4)">
+        <div class="row" style="margin-top:var(--s4)" id="keyzeile">
           <div class="field keyrow">
             <label for="key">API-Key (bleibt lokal, nur an deinen Server)</label>
             <input id="key" type="password" placeholder="OPENROUTER_API_KEY — optional, falls nicht in der Server-Umgebung" autocomplete="off" />
           </div>
         </div>
-        <p class="hint">Der Key wird ausschließlich für Stufe&nbsp;2 verwendet und nie in Stufe&nbsp;1 (Datenabruf) eingesetzt.</p>
+        <p class="hint" id="konfighint">Der Key wird ausschließlich für Stufe&nbsp;2 verwendet und nie in Stufe&nbsp;1 (Datenabruf) eingesetzt.</p>
       </div>
     </details>
 
@@ -319,26 +332,56 @@ function preisFmt(p){ return p!=null ? p.toLocaleString("de-DE",{minimumFraction
 function setRohStatus(html){ $("#rohstatus").innerHTML = html; }
 function setStatus(html){ $("#status").innerHTML = html; }
 
-// ----- Modelle (OpenRouter-Konfig) ------------------------------------------
+// ----- Modelle (LLM-Konfig: OpenRouter ODER Ollama) -------------------------
+function anbieter(){ return $("#anbieter").value; }
+
+// Hält das dauerhaft sichtbare "gewähltes Modell"-Chip im Konfig-Kopf aktuell --
+// auch wenn das Panel zugeklappt ist.
+function setGewaehlt(){
+  const sel = $("#modell");
+  const opt = sel.options[sel.selectedIndex];
+  const m = (sel.value && opt && !opt.disabled) ? sel.value : null;
+  const ab = anbieter() === "ollama" ? "Ollama (lokal)" : "OpenRouter";
+  $("#gewaehltChip").textContent = m ? `${m} · ${ab}` : `kein Modell · ${ab}`;
+}
+
 async function ladeModelle(q=""){
   const sel = $("#modell");
+  const ab = anbieter();
+  // Anbieter-spezifische UI: Ollama braucht weder Key noch Suche.
+  $("#keyzeile").style.display = ab === "ollama" ? "none" : "";
+  $("#suchfeld").style.display = ab === "ollama" ? "none" : "";
+  $("#konfighint").textContent = ab === "ollama"
+    ? "Lokale Modelle über Ollama (localhost:11434) — kein Key, kein Netz. Nur tool-fähige Modelle eignen sich."
+    : "Der Key wird ausschließlich für Stufe 2 verwendet und nie in Stufe 1 (Datenabruf) eingesetzt.";
+  const url = ab === "ollama" ? "/api/ollama-modelle" : ("/api/modelle?q=" + encodeURIComponent(q));
+  sel.innerHTML = "<option>lädt…</option>";
   try {
-    const r = await fetch("/api/modelle?q=" + encodeURIComponent(q));
+    const r = await fetch(url);
     if (!r.ok) throw new Error((await r.json()).detail || r.status);
     const liste = await r.json();
     sel.innerHTML = "";
-    if (!liste.length){ sel.innerHTML = "<option value=''>(keine Treffer)</option>"; return; }
+    if (!liste.length){
+      sel.innerHTML = ab === "ollama"
+        ? "<option value=''>(kein lokales Modell — Ollama gestartet? 'ollama serve')</option>"
+        : "<option value=''>(keine Treffer)</option>";
+      setGewaehlt(); return;
+    }
     for (const m of liste){
       const o = document.createElement("option");
       o.value = m.id;
-      const tag = m.frei ? "FREE" : "paid";
+      const tag = ab === "ollama" ? "lokal" : (m.frei ? "FREE" : "paid");
       const tools = m.tools ? "" : " ⚠ kein tool-calling";
       o.textContent = `${m.id}  [${tag}]${tools}`;
       if (!m.tools) o.disabled = true;
       sel.appendChild(o);
     }
+    const ok = [...sel.options].find(o => !o.disabled && o.value);
+    if (ok) sel.value = ok.value;   // erstes brauchbares (tool-fähiges) vorwählen
+    setGewaehlt();
   } catch (e){
     sel.innerHTML = `<option value=''>Modelle nicht abrufbar</option>`;
+    setGewaehlt();
   }
 }
 
@@ -438,8 +481,8 @@ async function kategorisiere(){
     const r = await fetch("/api/kategorisieren", {
       method:"POST", headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
-        plz, modell: $("#modell").value, anbieter:"openrouter",
-        key: $("#key").value || undefined
+        plz, modell: $("#modell").value, anbieter: anbieter(),
+        key: anbieter()==="openrouter" ? ($("#key").value || undefined) : undefined
       })
     });
     const d = await r.json();
@@ -477,9 +520,12 @@ async function kategorisiere(){
 function render(){
   const d = DATEN;
   $("#result").hidden = false;
+  const modellTxt = d.modell
+    ? ` <span class="sep">·</span> kategorisiert mit <b>${esc(d.modell)}</b>${d.anbieter?` <span class="t-h">(${esc(d.anbieter)})</span>`:""}`
+    : "";
   $("#summary").innerHTML =
     `Ort <b>${esc(d.ort_name || d.ort_plz)}</b> (PLZ ${esc(d.ort_plz)}) <span class="sep">·</span> <b>${d.anzahl}</b> Angebote <span class="sep">·</span>
-     Quellen: ${d.quellen.map(esc).join(", ") || "—"} <span class="sep">·</span> <b>${d.unsicher}</b> unsicher`;
+     Quellen: ${d.quellen.map(esc).join(", ") || "—"} <span class="sep">·</span> <b>${d.unsicher}</b> unsicher${modellTxt}`;
 
   const fh = $("#fhaendler");
   const aktuell = fh.value;
@@ -548,6 +594,8 @@ $("#rohholen").onclick = holeRohdaten;
 $("#kategorisieren").onclick = kategorisiere;
 $("#refresh").onclick = () => ladeModelle($("#modellsuche").value.trim());
 $("#modellsuche").addEventListener("keydown", e => { if (e.key==="Enter") ladeModelle(e.target.value.trim()); });
+$("#anbieter").addEventListener("change", () => ladeModelle());   // Anbieter umschalten -> Liste neu
+$("#modell").addEventListener("change", setGewaehlt);             // Auswahl -> sichtbares Chip aktualisieren
 $("#plz").addEventListener("keydown", e => { if (e.key==="Enter") holeRohdaten(); });
 let _plzTimer;
 $("#plz").addEventListener("input", () => {
@@ -559,12 +607,24 @@ for (const id of ["#fhaendler","#ftext","#fsicher"])
   $(id).addEventListener("input", () => DATEN && zeichneGruppen());
 
 // ----- Init ------------------------------------------------------------------
-ladeModelle();
-
-// Auto: ?plz=… vorbelegen (überschreibt den Default), dann GENAU EINMAL prüfen.
-const _p = new URLSearchParams(location.search);
-if (_p.get("plz")) $("#plz").value = _p.get("plz").trim();
-pruefeRohstand($("#plz").value.trim());
+// Bookmarkbar: ?plz=… [&anbieter=…] [&modell=…] [&auto=1]
+(async function init(){
+  const _p = new URLSearchParams(location.search);
+  if (_p.get("anbieter")) $("#anbieter").value = _p.get("anbieter");
+  await ladeModelle();
+  const m = _p.get("modell");
+  if (m){
+    const sel = $("#modell");
+    if (![...sel.options].some(o => o.value === m)){   // auch nicht-gelistetes zulassen
+      const o = document.createElement("option"); o.value = o.textContent = m;
+      sel.insertBefore(o, sel.firstChild);
+    }
+    sel.value = m; setGewaehlt();
+  }
+  if (_p.get("plz")) $("#plz").value = _p.get("plz").trim();
+  await pruefeRohstand($("#plz").value.trim());
+  if (_p.get("auto") && ROHDA) kategorisiere();   // Stufe 2 automatisch (wenn Rohdaten da)
+})();
 </script>
 </body>
 </html>
